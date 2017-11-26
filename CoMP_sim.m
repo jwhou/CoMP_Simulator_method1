@@ -36,7 +36,7 @@ Area = [500, 500]; % areaX, areaY
 average_Troughput = zeros(length(run_quantity), length(scheme_quantity));
 % ======================== Block 1 ========================
 % Block1: user inputs settings for simulation
-maxSimTime = 0.1;%1000*9*1e-6;
+maxSimTime = 1;%1000*9*1e-6;
 traffic_type = 0;
 traffic_rate = 0;
 % Initialize random number generator
@@ -255,16 +255,16 @@ clf(h)
 hold on
 if (envAPmodel == 2) 
     if (envUsermodel == 2)
-        title(['£l_A_P = ', num2str(tho(1)), ' (1/m^2) and £l_u_s_e_r = ', num2str(tho(2)), ' (1/m^2)'])
+        title(['Â£l_A_P = ', num2str(tho(1)), ' (1/m^2) and Â£l_u_s_e_r = ', num2str(tho(2)), ' (1/m^2)'])
     elseif (envUsermodel == 0)
-        title({['£l_A_P = ', num2str(tho(1)), ' in ', num2str(Area(1)), 'x', num2str(Area(2)), ' (m^2)'],...
-            ['£l_u_s_e_r = ', num2str(tho(2)), ' (1/m^2) in each AP cover area']})
+        title({['Â£l_A_P = ', num2str(tho(1)), ' in ', num2str(Area(1)), 'x', num2str(Area(2)), ' (m^2)'],...
+            ['Â£l_u_s_e_r = ', num2str(tho(2)), ' (1/m^2) in each AP cover area']})
     end
 elseif (envAPmodel == -1) 
     if (envUsermodel == 2)
-        title(['£l_u_s_e_r = ', num2str(tho(2)), ' (1/m^2)'])
+        title(['Â£l_u_s_e_r = ', num2str(tho(2)), ' (1/m^2)'])
     elseif (envUsermodel == 0)
-        title(['£l_u_s_e_r = ', num2str(tho(2)), ' (1/m^2) in each AP cover area'])
+        title(['Â£l_u_s_e_r = ', num2str(tho(2)), ' (1/m^2) in each AP cover area'])
     end
 end
 xlabel('Scheme')
