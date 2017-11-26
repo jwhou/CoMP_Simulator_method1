@@ -665,32 +665,37 @@ switch event.type
                     TempEvent.type = 'MUData_response';
                     TempEvent.STA_ID = i;
                     NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                    % The multi-antenna AP send Data so calculate ZF precoding matrice for MU
-                    selection_length = length(event.pkt.rv);
-                    if (selection_length >= 1)
-                        H = zeros(selection_length*Num_Rx, Num_Tx);
-                        for k=1:selection_length
-                            H((k-1)*Num_Rx+1:k*Num_Rx, :) = STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:);
-                        end
-                        W = H'/(H*H');
-                        if MIMO_Debug, disp('  -M: Channel H for precoder,'); disp(H); disp('  -M: Precoder H''/(H*H'') after calculating,'); disp(W); end
-                        temp = diag(W'*W).'; % diag output a colum vector, transpose it to row vector
-                        W = bsxfun(@rdivide, W, sqrt(temp)); % Normalize precoding matrix
-                        if MIMO_Debug, disp('  -M: Normalized precoder,'); disp(W); end
-                        for k=1:selection_length
-                            if (MIMO_Debug && k == 1), disp(['  -M: Divide normalized precoder by sqrt(' num2str(selection_length) ') to equal power,']); end
-                            STA_Info(i).Precoding_Matrix(:,(event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx) = W(:,(k-1)*Num_Rx+1:k*Num_Rx)/sqrt(selection_length);
-                        end
-                        if MIMO_Debug,
-                            disp(W/sqrt(selection_length));
-                            % Verify receives signal strength of each intended STA
-                            for k=1:selection_length
-                                temp_H = STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx, :);
-                                disp(['  -M: STA ' num2str(event.pkt.rv(k)) ' should receive signal strength ' num2str(trace(temp_H*STA_Info(i).Precoding_Matrix*(temp_H*STA_Info(i).Precoding_Matrix)'))]);
+                    switch PHY_CH_module
+                        case 'old'
+                            % The multi-antenna AP send Data so calculate ZF precoding matrice for MU
+                            selection_length = length(event.pkt.rv);
+                            if (selection_length >= 1)
+                                H = zeros(selection_length*Num_Rx, Num_Tx);
+                                for k=1:selection_length
+                                    H((k-1)*Num_Rx+1:k*Num_Rx, :) = STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:);
+                                end
+                                W = H'/(H*H');
+                                if MIMO_Debug, disp('  -M: Channel H for precoder,'); disp(H); disp('  -M: Precoder H''/(H*H'') after calculating,'); disp(W); end
+                                temp = diag(W'*W).'; % diag output a colum vector, transpose it to row vector
+                                W = bsxfun(@rdivide, W, sqrt(temp)); % Normalize precoding matrix
+                                if MIMO_Debug, disp('  -M: Normalized precoder,'); disp(W); end
+                                for k=1:selection_length
+                                    if (MIMO_Debug && k == 1), disp(['  -M: Divide normalized precoder by sqrt(' num2str(selection_length) ') to equal power,']); end
+                                    STA_Info(i).Precoding_Matrix(:,(event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx) = W(:,(k-1)*Num_Rx+1:k*Num_Rx)/sqrt(selection_length);
+                                end
+                                if MIMO_Debug,
+                                    disp(W/sqrt(selection_length));
+                                    % Verify receives signal strength of each intended STA
+                                    for k=1:selection_length
+                                        temp_H = STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx, :);
+                                        disp(['  -M: STA ' num2str(event.pkt.rv(k)) ' should receive signal strength ' num2str(trace(temp_H*STA_Info(i).Precoding_Matrix*(temp_H*STA_Info(i).Precoding_Matrix)'))]);
+                                    end
+                                end
+                            else
+                                error(['send_PHY: STA ' num2str(i) ' it is impossible to transmit Data packet to NULL']);
                             end
-                        end
-                    else
-                        error(['send_PHY: STA ' num2str(i) ' it is impossible to transmit Data packet to NULL']);
+                        case 'new'
+                            % Nothing need to do here.
                     end
                 elseif (event.pkt.MU == 1 && event.pkt.CoMP == 1)
                     %disp([' STA power  at 1 1' num2str(STA(i,5))]);
@@ -706,114 +711,118 @@ switch event.type
                         NewEvents = [NewEvents, TempEvent]; clear TempEvent;
                     end
                     if MIMO_Debug, disp(['  -M: CoMP transmission send Data to ' num2str(event.pkt.rv)]); end
-                    selection_length = length(event.pkt.rv);
-                    if (selection_length == length(event.pkt.CoMPGroup) && CoMP_Controller.CoMP_tx_mode == 0) % Networked MIMO
-                        CoMPAPs_length = length(CoMP_Controller.information(i).startorder);
-                        H = zeros(selection_length*Num_Rx, CoMPAPs_length*Num_Tx);
-                        for k=1:selection_length
-                            for l = 1:CoMPAPs_length
-                                CoMPAP_index = CoMP_Controller.information(i).startorder(l);
-                                temp_H = STA_Info(CoMPAP_index).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:);
-                                if (temp_H == zeros(Num_Rx, Num_Tx))
-                                    temp_H = sqrt(LongTerm_recv_power(CoMPAP_index, event.pkt.rv(k), rmodel))*(randn(Num_Rx, Num_Tx)+1i*randn(Num_Rx, Num_Tx))/sqrt(2);
-                                    % No CSI but restore temp CSI into STA_Info(i).Channel_Matrx, but STA_Info(i).TS do not record
-                                    STA_Info(CoMPAP_index).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:) = temp_H;
-                                end
-                                H((k-1)*Num_Rx+1:k*Num_Rx, (l-1)*Num_Tx+1:l*Num_Tx) = temp_H;
-                            end
-                        end
-                        W = H'/(H*H');
-                        if MIMO_Debug, disp('  -M: Channel H for precoder,'); disp(H); disp('  -M: Precoder H''/(H*H'') after calculating,'); disp(W); end
-                        temp = diag(W'*W).'; % diag output a colum vector, transpose it to row vector
-                        W = bsxfun(@rdivide, W, sqrt(temp)); % Normalize precoding matrix
-                        if MIMO_Debug, disp('  -M: Normalized precoder,'); disp(W); end
-                        for k=1:selection_length
-                            for l=1:CoMPAPs_length
-                                CoMPAP_index = CoMP_Controller.information(i).startorder(l);
-                                if (MIMO_Debug && k == 1 && l == 1), disp(['  -M: Divide normalized precoder by sqrt(' num2str(length(STA_Info(CoMPAP_index).IntendSTA)) ') to equal power,']); end
-                                STA_Info(CoMPAP_index).Precoding_Matrix(:,(event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx) = W((l-1)*Num_Tx+1:l*Num_Tx,(k-1)*Num_Rx+1:k*Num_Rx)/sqrt(length(STA_Info(CoMPAP_index).IntendSTA));
-                            end
-                        end
-                        if MIMO_Debug,
-                            for l=1:CoMPAPs_length
-                                CoMPAP_index = CoMP_Controller.information(i).startorder(l);
-                                disp(STA_Info(CoMPAP_index).Precoding_Matrix);
-                            end
-                            % Verify receives signal strength of each intended STA
-                            for k=1:selection_length
-                                rv_signal = [];
-                                for l = 1:CoMPAPs_length
-                                    CoMPAP_index = CoMP_Controller.information(i).startorder(l);
-                                    temp_H = STA_Info(CoMPAP_index).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx, :);
-                                    if (l == 1)
-                                        rv_signal = temp_H*STA_Info(CoMPAP_index).Precoding_Matrix;
-                                    else
-                                        rv_signal = rv_signal + temp_H*STA_Info(CoMPAP_index).Precoding_Matrix;
+                    
+                    switch PHY_CH_module
+                        case 'old'
+                            selection_length = length(event.pkt.rv);
+                            if (selection_length == length(event.pkt.CoMPGroup) && CoMP_Controller.CoMP_tx_mode == 0) % Networked MIMO
+                                CoMPAPs_length = length(CoMP_Controller.information(i).startorder);
+                                H = zeros(selection_length*Num_Rx, CoMPAPs_length*Num_Tx);
+                                for k=1:selection_length
+                                    for l = 1:CoMPAPs_length
+                                        CoMPAP_index = CoMP_Controller.information(i).startorder(l);
+                                        temp_H = STA_Info(CoMPAP_index).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:);
+                                        if (temp_H == zeros(Num_Rx, Num_Tx))
+                                            temp_H = sqrt(LongTerm_recv_power(CoMPAP_index, event.pkt.rv(k), rmodel))*(randn(Num_Rx, Num_Tx)+1i*randn(Num_Rx, Num_Tx))/sqrt(2);
+                                            % No CSI but restore temp CSI into STA_Info(i).Channel_Matrx, but STA_Info(i).TS do not record
+                                            STA_Info(CoMPAP_index).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:) = temp_H;
+                                        end
+                                        H((k-1)*Num_Rx+1:k*Num_Rx, (l-1)*Num_Tx+1:l*Num_Tx) = temp_H;
                                     end
                                 end
-                                disp(['  -M: STA ' num2str(event.pkt.rv(k)) ' should receive signal strength ' num2str(trace(rv_signal*rv_signal'))]);
+                                W = H'/(H*H');
+                                if MIMO_Debug, disp('  -M: Channel H for precoder,'); disp(H); disp('  -M: Precoder H''/(H*H'') after calculating,'); disp(W); end
+                                temp = diag(W'*W).'; % diag output a colum vector, transpose it to row vector
+                                W = bsxfun(@rdivide, W, sqrt(temp)); % Normalize precoding matrix
+                                if MIMO_Debug, disp('  -M: Normalized precoder,'); disp(W); end
+                                for k=1:selection_length
+                                    for l=1:CoMPAPs_length
+                                        CoMPAP_index = CoMP_Controller.information(i).startorder(l);
+                                        if (MIMO_Debug && k == 1 && l == 1), disp(['  -M: Divide normalized precoder by sqrt(' num2str(length(STA_Info(CoMPAP_index).IntendSTA)) ') to equal power,']); end
+                                        STA_Info(CoMPAP_index).Precoding_Matrix(:,(event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx) = W((l-1)*Num_Tx+1:l*Num_Tx,(k-1)*Num_Rx+1:k*Num_Rx)/sqrt(length(STA_Info(CoMPAP_index).IntendSTA));
+                                    end
+                                end
+                                if MIMO_Debug,
+                                    for l=1:CoMPAPs_length
+                                        CoMPAP_index = CoMP_Controller.information(i).startorder(l);
+                                        disp(STA_Info(CoMPAP_index).Precoding_Matrix);
+                                    end
+                                    % Verify receives signal strength of each intended STA
+                                    for k=1:selection_length
+                                        rv_signal = [];
+                                        for l = 1:CoMPAPs_length
+                                            CoMPAP_index = CoMP_Controller.information(i).startorder(l);
+                                            temp_H = STA_Info(CoMPAP_index).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx, :);
+                                            if (l == 1)
+                                                rv_signal = temp_H*STA_Info(CoMPAP_index).Precoding_Matrix;
+                                            else
+                                                rv_signal = rv_signal + temp_H*STA_Info(CoMPAP_index).Precoding_Matrix;
+                                            end
+                                        end
+                                        disp(['  -M: STA ' num2str(event.pkt.rv(k)) ' should receive signal strength ' num2str(trace(rv_signal*rv_signal'))]);
+                                    end
+                                end
+                            elseif (selection_length == length(event.pkt.CoMPGroup) && CoMP_Controller.CoMP_tx_mode == 1) % Coordinated Scheduling/Coordinated Beamforming
+                                H = zeros(selection_length*Num_Rx, Num_Tx);
+                                for k=1:selection_length
+                                    temp_H = STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:);
+                                    if (temp_H == zeros(Num_Rx, Num_Tx))
+                                        temp_H = sqrt(recv_power(i, event.pkt.rv(k), rmodel))*(randn(Num_Rx, Num_Tx)+1i*randn(Num_Rx, Num_Tx))/sqrt(2);
+                                        % No CSI but restore temp CSI into STA_Info(i).Channel_Matrx, but STA_Info(i).TS do not record
+                                        STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:) = temp_H;
+                                    end
+                                    H((k-1)*Num_Rx+1:k*Num_Rx, :) = temp_H;
+                                end
+                                W = H'/(H*H');
+                                if MIMO_Debug, disp('  -M: Channel H for precoder,'); disp(H); disp('  -M: Precoder H''/(H*H'') after calculating,'); disp(W); end
+                                temp = diag(W'*W).'; % diag output a colum vector, transpose it to row vector
+                                W = bsxfun(@rdivide, W, sqrt(temp)); % Normalize precoding matrix
+                                if MIMO_Debug, disp('  -M: Normalized precoder,'); disp(W); end
+                                for k=1:selection_length
+                                    if (MIMO_Debug && k == 1), disp(['  -M: Divide normalized precoder by sqrt(' num2str(length(STA_Info(i).IntendSTA)) ') to equal power,']); end
+                                    if (any(event.pkt.rv(k) == STA_Info(i).IntendSTA))
+                                        STA_Info(i).Precoding_Matrix(:,(event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx) = W(:,(k-1)*Num_Rx+1:k*Num_Rx)/sqrt(length(STA_Info(i).IntendSTA));
+                                    end
+                                end
+                                if MIMO_Debug,
+                                    disp(STA_Info(i).Precoding_Matrix);
+                                    % Verify receives signal strength of each intended STA
+                                    for k=1:selection_length
+                                        temp_H = STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx, :);
+                                        disp(['  -M: STA ' num2str(event.pkt.rv(k)) ' should receive signal strength ' num2str(trace(temp_H*STA_Info(i).Precoding_Matrix*(temp_H*STA_Info(i).Precoding_Matrix)'))]);
+                                    end
+                                end
+                            else % Networked MIMO and CS/CB fail => DL MU-MIMO
+                                H = zeros(selection_length*Num_Rx, Num_Tx);
+                                for k=1:selection_length
+                                    temp_H = STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:);
+                                    if (temp_H == zeros(Num_Rx, Num_Tx))
+                                        temp_H = sqrt(recv_power(i, event.pkt.rv(k), rmodel))*(randn(Num_Rx, Num_Tx)+1i*randn(Num_Rx, Num_Tx))/sqrt(2);
+                                        % No CSI but restore temp CSI into STA_Info(i).Channel_Matrx, but STA_Info(i).TS do not record
+                                        STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:) = temp_H;
+                                    end
+                                    H((k-1)*Num_Rx+1:k*Num_Rx, :) = temp_H;
+                                end
+                                W = H'/(H*H');
+                                if MIMO_Debug, disp('  -M: Channel H for precoder,'); disp(H); disp('  -M: Precoder H''/(H*H'') after calculating,'); disp(W); end
+                                temp = diag(W'*W).'; % diag output a colum vector, transpose it to row vector
+                                W = bsxfun(@rdivide, W, sqrt(temp)); % Normalize precoding matrix
+                                for k=1:selection_length
+                                    if (MIMO_Debug && k == 1), disp(['  -M: Divide normalized precoder by sqrt(' num2str(selection_length) ') to equal power,']); end
+                                    STA_Info(i).Precoding_Matrix(:,(event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx) = W(:,(k-1)*Num_Rx+1:k*Num_Rx)/sqrt(selection_length);
+                                end
+                                if MIMO_Debug,
+                                    disp(STA_Info(i).Precoding_Matrix);
+                                    % Verify receives signal strength of each intended STA
+                                    for k=1:selection_length
+                                        temp_H = STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx, :);
+                                        disp(['  -M: STA ' num2str(event.pkt.rv(k)) ' should receive signal strength ' num2str(trace(temp_H*STA_Info(i).Precoding_Matrix*(temp_H*STA_Info(i).Precoding_Matrix)'))]);
+                                    end
+                                end
                             end
-                        end
-                    elseif (selection_length == length(event.pkt.CoMPGroup) && CoMP_Controller.CoMP_tx_mode == 1) % Coordinated Scheduling/Coordinated Beamforming
-                        H = zeros(selection_length*Num_Rx, Num_Tx);
-                        for k=1:selection_length
-                            temp_H = STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:);
-                            if (temp_H == zeros(Num_Rx, Num_Tx))
-                                temp_H = sqrt(recv_power(i, event.pkt.rv(k), rmodel))*(randn(Num_Rx, Num_Tx)+1i*randn(Num_Rx, Num_Tx))/sqrt(2);
-                                % No CSI but restore temp CSI into STA_Info(i).Channel_Matrx, but STA_Info(i).TS do not record
-                                STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:) = temp_H;
-                            end
-                            H((k-1)*Num_Rx+1:k*Num_Rx, :) = temp_H;
-                        end
-                        W = H'/(H*H');
-                        if MIMO_Debug, disp('  -M: Channel H for precoder,'); disp(H); disp('  -M: Precoder H''/(H*H'') after calculating,'); disp(W); end
-                        temp = diag(W'*W).'; % diag output a colum vector, transpose it to row vector
-                        W = bsxfun(@rdivide, W, sqrt(temp)); % Normalize precoding matrix
-                        if MIMO_Debug, disp('  -M: Normalized precoder,'); disp(W); end
-                        for k=1:selection_length
-                            if (MIMO_Debug && k == 1), disp(['  -M: Divide normalized precoder by sqrt(' num2str(length(STA_Info(i).IntendSTA)) ') to equal power,']); end
-                            if (any(event.pkt.rv(k) == STA_Info(i).IntendSTA))
-                                STA_Info(i).Precoding_Matrix(:,(event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx) = W(:,(k-1)*Num_Rx+1:k*Num_Rx)/sqrt(length(STA_Info(i).IntendSTA));
-                            end
-                        end
-                        if MIMO_Debug,
-                            disp(STA_Info(i).Precoding_Matrix);
-                            % Verify receives signal strength of each intended STA
-                            for k=1:selection_length
-                                temp_H = STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx, :);
-                                disp(['  -M: STA ' num2str(event.pkt.rv(k)) ' should receive signal strength ' num2str(trace(temp_H*STA_Info(i).Precoding_Matrix*(temp_H*STA_Info(i).Precoding_Matrix)'))]);
-                            end
-                        end
-                    else % Networked MIMO and CS/CB fail => DL MU-MIMO
-                        H = zeros(selection_length*Num_Rx, Num_Tx);
-                        for k=1:selection_length
-                            temp_H = STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:);
-                            if (temp_H == zeros(Num_Rx, Num_Tx))
-                                temp_H = sqrt(recv_power(i, event.pkt.rv(k), rmodel))*(randn(Num_Rx, Num_Tx)+1i*randn(Num_Rx, Num_Tx))/sqrt(2);
-                                % No CSI but restore temp CSI into STA_Info(i).Channel_Matrx, but STA_Info(i).TS do not record
-                                STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:) = temp_H;
-                            end
-                            H((k-1)*Num_Rx+1:k*Num_Rx, :) = temp_H;
-                        end
-                        W = H'/(H*H');
-                        if MIMO_Debug, disp('  -M: Channel H for precoder,'); disp(H); disp('  -M: Precoder H''/(H*H'') after calculating,'); disp(W); end
-                        temp = diag(W'*W).'; % diag output a colum vector, transpose it to row vector
-                        W = bsxfun(@rdivide, W, sqrt(temp)); % Normalize precoding matrix
-                        for k=1:selection_length
-                            if (MIMO_Debug && k == 1), disp(['  -M: Divide normalized precoder by sqrt(' num2str(selection_length) ') to equal power,']); end
-                            STA_Info(i).Precoding_Matrix(:,(event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx) = W(:,(k-1)*Num_Rx+1:k*Num_Rx)/sqrt(selection_length);
-                        end
-                        if MIMO_Debug,
-                            disp(STA_Info(i).Precoding_Matrix);
-                            % Verify receives signal strength of each intended STA
-                            for k=1:selection_length
-                                temp_H = STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx, :);
-                                disp(['  -M: STA ' num2str(event.pkt.rv(k)) ' should receive signal strength ' num2str(trace(temp_H*STA_Info(i).Precoding_Matrix*(temp_H*STA_Info(i).Precoding_Matrix)'))]);
-                            end
-                        end
+                        case 'new'
+                            % Nothing need to do here.
                     end
-                else
-                    %disp([' STA power  at else' num2str(STA(i,5))]);
                 end
                 if queue_Debug,
                     disp(['  -Q: @ action_CoMP.m: ']);
@@ -832,7 +841,12 @@ switch event.type
                     if (~isempty(pktsize_buf))
                         for k=1:length(j)
                             AP_index = STA(j(k), 3);
-                            aggr = pktsize_buf(k)/(size_MAC_body*num_msdu);
+                            switch PHY_CH_module
+                                case 'old'
+                                    aggr = pktsize_buf(k)/size_MAC_body;
+                                case 'new'
+                                    aggr = pktsize_buf(k)/(size_MAC_body*num_msdu);
+                            end
                             if (AP_index == i && aggr ~= 0)
                                 traffic_queue(i).list(find(traffic_queue(i).list == j(k), aggr)) = [];
                                 traffic_queue(i).size(STA_Info(i).associated_STA == j(k)) = traffic_queue(i).size(STA_Info(i).associated_STA == j(k)) - aggr;

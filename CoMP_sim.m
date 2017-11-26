@@ -24,10 +24,10 @@ global RTS_method;
 global lastsounding_enable;
 
 % scheme_quantity = [1,2,3];
-scheme_quantity = [1,2]; % testing by shuyu 
+scheme_quantity = [2]; % testing by shuyu 
 RTS_method = 0; %testing by jing-wen  0: no RTS, 1: Typical RTS, 2: RTS Simultaneously
 lastsounding_enable = 0; %testing by jing-wen  0: no record, 1: record
-run_quantity = [1,2,3];
+run_quantity = [1];
 envAPmodel = -2; % [-2:specail case, -1: Fixed AP location, 0: Square grid, 1:Hexagonal grid, 2: PPP]
 AP_distance = 90; 
 envUsermodel = -2; % [-2:special case, -1: Fixed users, 0: Users around AP, 1:Hexagonal grid, 2: PPP]
@@ -36,7 +36,7 @@ Area = [500, 500]; % areaX, areaY
 average_Troughput = zeros(length(run_quantity), length(scheme_quantity));
 % ======================== Block 1 ========================
 % Block1: user inputs settings for simulation
-maxSimTime = 1;%1000*9*1e-6;
+maxSimTime = 0.1;%1000*9*1e-6;
 traffic_type = 0;
 traffic_rate = 0;
 % Initialize random number generator
@@ -227,6 +227,7 @@ for ind0=1:length(run_quantity)
                         end
                     else
                         edge_throughput = [edge_throughput, separate_statics(sel_STA)];
+                        num_edge = num_edge + 1;
                     end
                 end
             end
