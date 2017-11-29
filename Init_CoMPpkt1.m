@@ -217,17 +217,17 @@ switch RTS_method
         end
     case 1
         if(t - CoMP_Controller.information(i).lastsounding < soundingperiod && CoMP_Controller.information(i).lastsounding ~= -1)
-            CoMP_pkt.nav = (length(STA_Info(i).CoMP_coordinator))*(SIFS+RTS_tx_time)+length(CoMP_pkt.rv)*(SIFS+CTS_tx_time) + tx_time(CoMP_pkt) +...
+            CoMP_Controller.information(i).readyRTS = 1;
+            CoMP_pkt.nav = (length(STA_Info(i).CoMP_coordinator))*(SIFS+RTS_tx_time)+length(CoMP_pkt.rv)*(SIFS+CTS_tx_time)+SIFS+tx_time(CoMP_pkt) +...
                 length(CoMP_pkt.rv)*(SIFS+ACK_tx_time);
             CoMP_pkt.type = 'RTS';
         elseif (CoMP_pkt.sum_sounding > 0)
-            CoMP_pkt.nav = SIFS + NDPTime + SIFS + CompressedBeamformingTime + (soundingNum - 1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime);
-            CoMP_pkt.type = 'NDP_Ann';
-        elseif (sum(CoMP_pkt.sounding_index(2,:)) > 0 || CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS == 1)
-            CoMP_pkt.nav = 0;
+            CoMP_Controller.information(i).readyRTS = 0;
+            CoMP_pkt.nav = SIFS + NDPTime + SIFS + CompressedBeamformingTime + (length(CoMP_pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime);
             CoMP_pkt.type = 'NDP_Ann';
         else
-            CoMP_pkt.nav = (length(STA_Info(i).CoMP_coordinator))*(SIFS+RTS_tx_time)+length(CoMP_pkt.rv)*(SIFS+CTS_tx_time) + tx_time(CoMP_pkt) +...
+            CoMP_Controller.information(i).readyRTS = 1;
+            CoMP_pkt.nav = (length(STA_Info(i).CoMP_coordinator))*(SIFS+RTS_tx_time)+length(CoMP_pkt.rv)*(SIFS+CTS_tx_time)+SIFS+tx_time(CoMP_pkt) +...
                 length(CoMP_pkt.rv)*(SIFS+ACK_tx_time);
             CoMP_pkt.type = 'RTS';
         end
