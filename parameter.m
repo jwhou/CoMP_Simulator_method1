@@ -42,6 +42,7 @@ global Max_Report_P; %add by jing-wen
 global skip_cal_MCS_sp_Debug %add by jing-wen
 global PHY_CH_module;
 global num_msdu;
+global spatial_stream;
 % ========== New for CoMP parameter ==========
 Max_Report_P = 3; %added by jing-wen
 ClusterSize = 3; %added by jing-wen (not yet)
@@ -51,7 +52,7 @@ soundingIndex = 0;
 numSTAs = Num_AP + Num_User;
 % ========== Our 802.11ac channel model ========== 
 PHY_CH_module = 'new'; %old:shuyu; new:new
-select_user = 0; %0:做MU-MIMO盡量服務到最多user 1:做SU-MIMO:2-2,3-3,4-4
+select_algo = 1; %0:做MU-SISO盡量服務到最多user 1:做MU-MIMO:2-2,4-2,4-4,6-2
 Npkt=30;
 Npkt_length=1;% parameter use in fc_beamtracking.m
 AI=[1 -1 2 3 4 5 -2 -3 -4 -5 0];
@@ -77,7 +78,7 @@ num_msdu = floor((mpdu_size-FCS_size-size_MAC_header)/size_MAC_body);
 % Nsubcarrier=512; % number of subcarriers  (should follow Bandwidth)
 % ========== Debug parameters ==========
 event_Debug = 0; 
-detail_Debug = 0;
+detail_Debug = 1;
 power_Debug = 0;
 MIMO_Debug = 0;
 queue_Debug = 0;
@@ -97,8 +98,14 @@ cover_range = 50; % unit meter
 
 % =========== PHY parameters ===========
 % Antenna size
-Num_Tx = 4;
+Num_Tx = 6;
 Num_Rx = 2;
+
+if select_algo == 1
+    spatial_stream = Num_Rx;
+elseif select_algo == 0
+    spatial_stream = 1;
+end
 
 % Dynmic MCS, please see estimate_SNR.m, PER_approximation.m and Init_CoMPpkt.m for details
 % which involves A-MSDU or A-MPDU (global variable: Mode_AMPDU_AMSDU)

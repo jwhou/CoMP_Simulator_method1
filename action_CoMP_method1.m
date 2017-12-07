@@ -37,6 +37,7 @@ global lastsounding_enable;
 global cover_range;
 global Max_Report_P;
 global num_msdu;
+global spatial_stream;
 
 NewEvents = [];
 
@@ -102,15 +103,21 @@ switch event.type
             TempEvent.pkt.tx = i;
             TempEvent.pkt.sum_sounding=0;
             if (STA(i, 3) == 0)
+                num_ant = Num_Tx/spatial_stream;
                 % Using FIFO to select users
-                primary_user = traffic_queue(i).list(1);
-                if (floor(Num_Tx/Num_Rx) >= 2)
-                    secondary_user = traffic_queue(i).list(find(traffic_queue(i).list ~= primary_user, floor(Num_Tx/Num_Rx)-1));
-                else
-                    secondary_user = [];
+                temp_queue = traffic_queue(i).list;
+                select_rv = temp_queue(1);
+                num_ant = num_ant - 1;
+                temp_queue = temp_queue(temp_queue ~= select_rv);
+                while num_ant ~= 0
+                    newSTA = temp_queue(find(temp_queue,1));
+                    if isempty(newSTA)
+                        break;
+                    end
+                    select_rv = [select_rv, newSTA];
+                    temp_queue = temp_queue(temp_queue ~= newSTA);
+                    num_ant = num_ant - 1;
                 end
-                select_rv = [primary_user, secondary_user];
-                spatial_stream = Num_Rx;
                 if any(ismember(select_rv, STA_Info(i).edge_STA))
                     TempEvent.pkt.power = default_power;
                     TempEvent.pkt.cover_range = cover_range;
@@ -163,6 +170,12 @@ switch event.type
                                     else
                                         TempEvent.pkt.nav = SIFS + ACK_tx_time;
                                     end
+                                case 1
+                                    if TempEvent.pkt.sum_sounding > 0
+                                        TempEvent.pkt.nav = SIFS + NDPTime + SIFS + CompressedBeamformingTime;
+                                    else
+                                        TempEvent.pkt.nav = SIFS + CTS_tx_time + SIFS +tx_time(TempEvent.pkt)+ SIFS + ACK_tx_time;
+                                    end
                             end
                             
                         elseif (TempEvent.pkt.MU == 1 && TempEvent.pkt.CoMP == 0)
@@ -189,6 +202,12 @@ switch event.type
                                         TempEvent.pkt.nav = SIFS + NDPTime + SIFS + CompressedBeamformingTime + (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime);
                                     else
                                         TempEvent.pkt.nav = length(TempEvent.pkt.rv)*(SIFS + ACK_tx_time);
+                                    end
+                                case 1
+                                    if TempEvent.pkt.sum_sounding > 0
+                                        TempEvent.pkt.nav = SIFS + NDPTime + SIFS + CompressedBeamformingTime + (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime);
+                                    else
+                                        TempEvent.pkt.nav = length(TempEvent.pkt.rv)*(SIFS+CTS_tx_time)+SIFS+tx_time(TempEvent.pkt)+length(TempEvent.pkt.rv)*(SIFS+ACK_tx_time);
                                     end
                             end
                         end
@@ -1320,6 +1339,10 @@ switch event.type
         i = event.STA_ID;
         if (event.pkt.MU == 0 && event.pkt.CoMP == 0)
             if (isempty(STA_Info(i).soundingqueue))
+                [MCS_index,~] = fc_return_MCS_Int(per_order,i,event.pkt.Group, Num_Tx,spatial_stream,freq,...
+                    Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
+                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI);
+                STA_Info(i).MCS_record(event.pkt.Group - Num_AP) = MCS_index;
                 TempEvent = event;
                 TempEvent.timer = t;
                 TempEvent.type = 'send_MAC';
@@ -1360,6 +1383,10 @@ switch event.type
         elseif (event.pkt.MU == 1 && event.pkt.CoMP == 0)
             
             if (isempty(STA_Info(i).soundingqueue))
+                [MCS_index,~] = fc_return_MCS_Int(per_order,i,event.pkt.Group, Num_Tx,spatial_stream,freq,...
+                    Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
+                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI);
+                STA_Info(i).MCS_record(event.pkt.Group - Num_AP) = MCS_index;
                 TempEvent = event;
                 TempEvent.timer = t;
                 TempEvent.type = 'send_MAC';
@@ -1406,7 +1433,10 @@ switch event.type
                 end
             end
             if (isempty(STA_Info(i).soundingqueue))
-                STA_Info(i).soundingqueue = [];
+                [MCS_index,~] = fc_return_MCS_Int(per_order,i,event.pkt.CoMPGroup, Num_Tx,spatial_stream,freq,...
+                    Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
+                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI);
+                STA_Info(i).MCS_record(event.pkt.CoMPGroup - Num_AP) = MCS_index;
                 TempEvent = event;
                 TempEvent.timer = t + eps;
                 TempEvent.type = 'MUNDP_response';
@@ -1590,6 +1620,7 @@ switch event.type
                         TempEvent.STA_ID = CoMPAP_index;
                         TempEvent.pkt.tx = CoMPAP_index;
                         TempEvent.pkt.rv = CoMP_Controller.information(CoMPAP_index).pkt.CoMPGroup;
+                        TempEvent.pkt.CoMPGroup = CoMP_Controller.information(CoMPAP_index).pkt.CoMPGroup;
                         TempEvent.pkt.size = CoMP_Controller.information(CoMPAP_index).pkt.size;
                         TempEvent.pkt.type = 'Data';
                         % Creat a new id for the data packet
@@ -1612,6 +1643,7 @@ switch event.type
                             %TempEvent.pkt.size = TempEvent.pkt.size.*ismember(event.pkt.CoMPGroup, TempEvent.pkt.rv)';
                             %TempEvent.pkt.rv(TempEvent.pkt.rv == 0) = [];
                             TempEvent.pkt.rv = CoMP_Controller.information(CoMPAP_index).pkt.CoMPGroup;
+                            TempEvent.pkt.CoMPGroup = CoMP_Controller.information(CoMPAP_index).pkt.CoMPGroup;
                             TempEvent.pkt.size = CoMP_Controller.information(CoMPAP_index).pkt.size;
                             TempEvent.pkt.type = 'Data';
                             TempEvent.pkt.id = new_id(CoMPAP_index);
@@ -1786,7 +1818,7 @@ switch event.type
                 case 'new'
                     if (strcmp(event.pkt.type, 'Data') == 1)
                         if (event.pkt.MU == 0 && event.pkt.CoMP == 0)
-                            [snr, Prob] = fc_recv_phy(event.pkt.MCS_index, i,j, Num_Tx,Num_Rx,freq,...
+                            [snr, Prob] = fc_recv_phy(event.pkt.MCS_index, i,j, Num_Tx,spatial_stream,freq,...
                                                     Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
                                                     tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,event.pkt.size,AI,event.pkt.type);
                             %Prob = 0;
@@ -1794,7 +1826,7 @@ switch event.type
                             if (isempty(event.pkt.MCS_index(j==event.pkt.Group)))
                                 Prob = 1;
                             else
-                                [snr, Prob] = fc_recv_phy(event.pkt.MCS_index(j==event.pkt.Group), i,j, Num_Tx,Num_Rx,freq,...
+                                [snr, Prob] = fc_recv_phy(event.pkt.MCS_index(j==event.pkt.Group), i,j, Num_Tx,spatial_stream,freq,...
                                                     Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
                                                     tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,event.pkt.size(j==event.pkt.Group),AI,event.pkt.type);
                                 %Prob = 0;
@@ -1803,7 +1835,7 @@ switch event.type
                             if (isempty(event.pkt.MCS_index(j==event.pkt.CoMPGroup)))
                                 Prob = 1;
                             else
-                                [snr, Prob] = fc_recv_phy(event.pkt.MCS_index(j==event.pkt.CoMPGroup), i(i==STA(j,3)),j, Num_Tx,Num_Rx,freq,...
+                                [snr, Prob] = fc_recv_phy(event.pkt.MCS_index(j==event.pkt.CoMPGroup), i(i==STA(j,3)),j, Num_Tx,spatial_stream,freq,...
                                                     Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
                                                     tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,event.pkt.size(j==event.pkt.CoMPGroup),AI,event.pkt.type);
                                 %    Prob = 0;
@@ -1911,10 +1943,11 @@ switch event.type
                                     case 'old'
                                         STA_Info(j).Channel_Matrix((i-1)*Num_Rx+1:i*Num_Rx, :) = sqrt(recv_power(i, j, rmodel))*(randn(Num_Rx, Num_Tx)+1i*randn(Num_Rx, Num_Tx))/sqrt(2);
                                     case 'new'
-                                        [MCS_index,~] = fc_return_MCS(per_order,j,i, Num_Tx,Num_Rx,freq,...
-                                                    Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-                                                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI);
-                                        STA_Info(j).MCS_record(i-Num_AP) = MCS_index;
+%                                         [MCS_index,~] = fc_return_MCS(per_order,j,i, Num_Tx,spatial_stream,freq,...
+%                                                      Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
+%                                                      tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI);
+%                                         MCS_index = 1;
+%                                         STA_Info(j).MCS_record(i-Num_AP) = MCS_index;
                                         
                                 end
                                 STA_Info(j).CSI_TS(i-Num_AP) = t;
@@ -1933,14 +1966,15 @@ switch event.type
                                     case 'old'
                                         STA_Info(j).Channel_Matrix((i-1)*Num_Rx+1:i*Num_Rx, :) = sqrt(recv_power(i, j, rmodel))*(randn(Num_Rx, Num_Tx)+1i*randn(Num_Rx, Num_Tx))/sqrt(2);
                                     case 'new'
-                                        if ((t - STA_Info(j).CSI_TS(i-Num_AP)) < soundingperiod && skip_cal_MCS_sp_Debug)
-                                            MCS_index = STA_Info(j).MCS_record(i - Num_AP);
-                                        else
-                                            [MCS_index,~] = fc_return_MCS(per_order,j,i, Num_Tx,Num_Rx,freq,...
-                                                Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-                                                tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI);
-                                        end
-                                        STA_Info(j).MCS_record(i-Num_AP) = MCS_index;
+%                                         if ((t - STA_Info(j).CSI_TS(i-Num_AP)) < soundingperiod && skip_cal_MCS_sp_Debug)
+%                                             MCS_index = STA_Info(j).MCS_record(i - Num_AP);
+%                                         else
+%                                             [MCS_index,~] = fc_return_MCS(per_order,j,i, Num_Tx,spatial_stream,freq,...
+%                                                 Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
+%                                                 tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI);
+%                                             MCS_index=1;
+%                                         end
+%                                         STA_Info(j).MCS_record(i-Num_AP) = MCS_index;
                                 end
                                 STA_Info(j).CSI_TS(i-Num_AP) = t;
                                 if MIMO_Debug, disp(['  -M: Channel Matrix(CSI), H' num2str(i) num2str(j) ' = ']); disp(STA_Info(j).Channel_Matrix((i-1)*Num_Rx+1:i*Num_Rx, :)); end
@@ -1960,18 +1994,18 @@ switch event.type
                                     case 'old'
                                         STA_Info(j).Channel_Matrix((i-1)*Num_Rx+1:i*Num_Rx, :) = sqrt(recv_power(i, j, rmodel))*(randn(Num_Rx, Num_Tx)+1i*randn(Num_Rx, Num_Tx))/sqrt(2);
                                     case 'new'
-                                        if STA(i, 3) == j
-                                            if ((t - STA_Info(j).CSI_TS(i-Num_AP)) < soundingperiod && skip_cal_MCS_sp_Debug)
-                                                MCS_index = STA_Info(j).MCS_record(i - Num_AP);
-                                            else
-                                                [MCS_index,~] = fc_return_MCS(per_order,j,i, Num_Tx,Num_Rx,freq,...
-                                                Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-                                                tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI);
-                                            end
-                                        else
-                                            MCS_index = 1;
-                                        end
-                                        STA_Info(j).MCS_record(i-Num_AP) = MCS_index;
+%                                         if STA(i, 3) == j
+%                                             if ((t - STA_Info(j).CSI_TS(i-Num_AP)) < soundingperiod && skip_cal_MCS_sp_Debug)
+%                                                 MCS_index = STA_Info(j).MCS_record(i - Num_AP);
+%                                             else
+%                                                 [MCS_index,~] = fc_return_MCS(per_order,j,i, Num_Tx,spatial_stream,freq,...
+%                                                 Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
+%                                                 tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI);
+%                                             end
+%                                         else
+%                                             MCS_index = 1;
+%                                         end
+%                                         STA_Info(j).MCS_record(i-Num_AP) = MCS_index;
                                 end
                                 STA_Info(j).CSI_TS(i-Num_AP) = t;
                                 if MIMO_Debug, disp(['  -M: Channel Matrix(CSI), H' num2str(i) num2str(j) ' = ']); disp(STA_Info(j).Channel_Matrix((i-1)*Num_Rx+1:i*Num_Rx, :)); end
