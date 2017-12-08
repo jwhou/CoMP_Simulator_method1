@@ -42,13 +42,13 @@ if(AP_distribution == -2)
     if (User_distribution == -2)
         User_location = [
               40,50;
-%               50,40;
-%              50,60;
+              50,40;
+             50,60;
               60,50;
                
                95,50;
-%               105,40;
-%               105,60 
+              105,40;
+              105,60 
                115,50;
               
 %               40,100;
@@ -61,7 +61,7 @@ if(AP_distribution == -2)
 %               105,110 
 %               115,100;
             ];
-          NumUser = 4;
+          NumUser = 8;
     end
 
 

@@ -26,7 +26,7 @@ function [MCS_index,snr_dB] = fc_return_MCS_Int(target_PER,tx,rv,N_tx,N_rx,freq,
     Nsubcarrier,Pt,channel_model,Bandwidth,Thermal_noise,...
     tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range, L,tempindex_AI)
 
-global STA;
+global STA STA_Info;
 global per_order;
 
 tx_x_pos=STA(tx, 1);
@@ -171,13 +171,35 @@ for ind_sym=1:1:Nsym
             T5{j} = T5{j} + trace(H_user'*H_user); %SNR
         end
     end
+    STA_Info(tx).Precoder_record{ind_sym} = M;
 end
 
 for k=1:1:length(rv)
+    pr = 0;
+    I = find(STA(:, 5)>0);
+    for i=1:length(I)
+        tx1 = I(i);
+        if tx1 == rv, continue; end
+        if any(tx1 == tx), continue; end
+        if (STA(tx1, 8) == 2) % tx1 transmits Data pkt
+            if (STA(tx1, 3) == 0) % tx1 is an AP
+                temp_N_tx = length(STA_Info(tx1).Precoder_record{1}(:,1,1));
+                pr = pr + fc_cal_interference(tx1,rv(k),temp_N_tx,N_rx,freq,...
+                    Nsubcarrier,Pt,channel_model,Bandwidth,Thermal_noise,...
+                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
+            else % tx1 is a non-AP STA
+                %Donot have uplink
+            end
+        else % tx transmits RTS/CTS/ACK pkt, do not care # of antennas
+            pr = pr + fc_cal_interference(tx1,rv(k),1,N_rx,freq,...
+                Nsubcarrier,Pt,channel_model,Bandwidth,Thermal_noise,...
+                tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
+        end
+    end
     MCS_init = 7;
     T5{k} = T5{k}/Nsym;
     %SNR=(1/Nsubcarrier)*Pt*abs(t5)/(Nt*Nr*Thermal_noise);  %abs is needed?
-    T5{k} = (1/Nsubcarrier)*Pt*T5{k}/(N_tx*N_rx*Thermal_noise);
+    T5{k} = (1/Nsubcarrier)*Pt*T5{k}/(N_tx*N_rx*Thermal_noise)+pr;
     snr_dB(k)=10*log10(T5{k});
     gamma = T5{k};
     R_corr = abs(T1{k})/(abs((T3{k}))/N_rx); % receive spatial correlation matrix
