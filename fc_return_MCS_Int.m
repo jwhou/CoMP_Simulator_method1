@@ -28,6 +28,7 @@ function [MCS_index,snr_dB] = fc_return_MCS_Int(target_PER,tx,rv,N_tx,N_rx,freq,
 
 global STA STA_Info;
 global per_order;
+global control_intf_skip_Debug;
 
 tx_x_pos=STA(tx, 1);
 tx_y_pos=STA(tx, 2);
@@ -94,64 +95,66 @@ for k=1:length(rv)
     T4{k} = t4;
     T5{k} = t5;
 end
+
+for k=1:1:length(rv)
+    % ============== Retrieving AoDs and Traveling distances ============ %
+    % [AoAAoD,Ncluster,distance,index,wall_in_count,collision_in_count]=fc_cal_main_path(...
+    %     channel_type,collision_times,wall_mix,wall_index,HOV,tx,ty,rx,ry,room_range);
+    [AoAAoD,Ncluster{k},distance,index,wall_in_count,collision_in_count]=fc_cal_main_path(...
+        reflection_times,wall_mix,wall_index,HOV,tx_x_pos,tx_y_pos,rx_x_pos(k),rx_y_pos(k),room_range);
+    % ======================= End of retrieve =========================== %
     
+    % =================================================================== %
+    % Calculate in count part when there are a lot of rays in the system  %
+    % For example, model type B only need 2 cluster. So we only want to   %
+    % calculate 2 cluster with their distance, antenna gain, path loss and%
+    % angle of departure (AoD).                                           %
+    % ====================================================================%
+    LOS = 0;
+    
+    % <----- Ncluster = 0? -----
+    if Ncluster{k} == 0
+        error('Error in fc_give_MIMO_SM_PER().m, Ncluster==0')
+    end
+    % ----- Ncluster = 0? ----->
+    
+    Ant_gain_in_count=zeros(1,Ncluster{k});
+    AoD_in_count=zeros(1,Ncluster{k});
+    AoD_in_floor{k}=zeros(1,Ncluster{k});
+    Distance_in_count = distance(1:1:Ncluster{k});
+    
+    for q=1:1:Ncluster{k}
+        AoD_in_count(1,q)=AoAAoD(1,index(1,q));
+        temp_AoD = floor(AoAAoD(1,index(1,q)));
+        AoD_in_floor{k}(1,q) = temp_AoD;
+        AoD_index=temp_AoD+1;
+        Ant_gain_in_count(1,q) = ant_gain(1,AoD_index);
+    end
+    %PL_dB_in_count=fc_path_loss(channel_type,Distance_in_count,freq,LOS,Npkt*Nsym); % Path loss effect of each cluster in dB
+    PL_dB_in_count{k}=fix_fc_path_loss(channel_model,Distance_in_count,freq,LOS,Npkt*Nsym,Ncluster{k}); % Path loss effect of each cluster in dB
+    % =========== End of getting the imformation of in count ray ======== %
+    
+    % ================ Get Angular Spread for each main path ============ %
+    angular{k}=fc_cal_angular_spread(wall_mix,wall_index,HOV,tx_x_pos,tx_y_pos,rx_x_pos(k),rx_y_pos(k),...
+        channel_model,AoD_in_count,wall_in_count,Ncluster{k},reflection_times,collision_in_count);
+    % ======================== End of getting AS ======================== %
+end
+
 for ind_sym=1:1:Nsym
+    h_temp=zeros(N_tx*N_rx,Nsubcarrier);
     for k=1:1:length(rv)
-        % ============== Retrieving AoDs and Traveling distances ============ %
-        % [AoAAoD,Ncluster,distance,index,wall_in_count,collision_in_count]=fc_cal_main_path(...
-        %     channel_type,collision_times,wall_mix,wall_index,HOV,tx,ty,rx,ry,room_range);
-        [AoAAoD,Ncluster,distance,index,wall_in_count,collision_in_count]=fc_cal_main_path(...
-            reflection_times,wall_mix,wall_index,HOV,tx_x_pos,tx_y_pos,rx_x_pos(k),rx_y_pos(k),room_range);
-        % ======================= End of retrieve =========================== %
-        
-        % =================================================================== %
-        % Calculate in count part when there are a lot of rays in the system  %
-        % For example, model type B only need 2 cluster. So we only want to   %
-        % calculate 2 cluster with their distance, antenna gain, path loss and%
-        % angle of departure (AoD).                                           %
-        % ====================================================================%
-        LOS = 0;
-        
-        % <----- Ncluster = 0? -----
-        if Ncluster == 0
-            error('Error in fc_give_MIMO_SM_PER().m, Ncluster==0')
-        end
-        % ----- Ncluster = 0? ----->
-        
-        Ant_gain_in_count=zeros(1,Ncluster);
-        AoD_in_count=zeros(1,Ncluster);
-        AoD_in_floor=zeros(1,Ncluster);
-        Distance_in_count = distance(1:1:Ncluster);
-        
-        for q=1:1:Ncluster
-            AoD_in_count(1,q)=AoAAoD(1,index(1,q));
-            temp_AoD = floor(AoAAoD(1,index(1,q)));
-            AoD_in_floor(1,q) = temp_AoD;
-            AoD_index=temp_AoD+1;
-            Ant_gain_in_count(1,q) = ant_gain(1,AoD_index);
-        end
-        %PL_dB_in_count=fc_path_loss(channel_type,Distance_in_count,freq,LOS,Npkt*Nsym); % Path loss effect of each cluster in dB
-        PL_dB_in_count=fix_fc_path_loss(channel_model,Distance_in_count,freq,LOS,Npkt*Nsym,Ncluster); % Path loss effect of each cluster in dB
-        % =========== End of getting the imformation of in count ray ======== %
-        
-        % ================ Get Angular Spread for each main path ============ %
-        angular=fc_cal_angular_spread(wall_mix,wall_index,HOV,tx_x_pos,tx_y_pos,rx_x_pos(k),rx_y_pos(k),...
-            channel_model,AoD_in_count,wall_in_count,Ncluster,reflection_times,collision_in_count);
-        % ======================== End of getting AS ======================== %
-        
-        
         % generating the channel coefficients in time and frequency domain
-        h_time=fc_generate_h(Nsubcarrier,N_tx,N_rx,channel_model,AoD_in_floor,...
-            Samping_rate_expansion_factor,PL_dB_in_count,ant_gain,Ncluster,angular);
-        
-        %h_temp=zeros(size(h_time));
+        h_time=fc_generate_h(Nsubcarrier,N_tx,N_rx,channel_model,AoD_in_floor{k},...
+            Samping_rate_expansion_factor,PL_dB_in_count{k},ant_gain,Ncluster{k},angular{k});
         for ind=1:1:N_tx*N_rx
             col=ind+((k-1)*N_tx*N_rx);
             h_temp(col,:)=fft(h_time(ind,:),Nsubcarrier)/sqrt(Nsubcarrier);
         end
     end
-    H_freq=zeros(N_rx*length(rv),N_tx,Nsubcarrier);
+    H_freq = zeros(N_rx*length(rv),N_tx,Nsubcarrier);
+    H_new =zeros(N_rx*length(rv),N_tx,Nsubcarrier);
     M = zeros(N_tx, N_rx*length(rv), Nsubcarrier);
+    
     for index_f=1:1:Nsubcarrier
         H_freq(:,:,index_f)=reshape(h_temp(:,index_f),N_rx*length(rv),N_tx);
         for j=1:length(rv)
@@ -160,17 +163,19 @@ for ind_sym=1:1:Nsym
             nown_stream = all_stream(~ismember(all_stream, own_stream));
             M(:,own_stream,index_f) = null(H_freq(nown_stream,:,index_f));
         end
-%        M(:,:,index_f)=[ null(H_freq(3:6,:,index_f)) null(H_freq([1 2 5 6],:,index_f)) null(H_freq(1:4,:,index_f))];
         H_new(:,:,index_f)=H_freq(:,:,index_f)*M(:,:,index_f);
         for j=1:length(rv)
             H_user = H_new((j-1)*N_rx+1:1:(j-1)*N_rx+N_rx,(j-1)*N_rx+1:1:(j-1)*N_rx+N_rx,index_f);
-            T1{j} = T1{j} + H_user*H_user'; %receive
-            T2{j} = T2{j} + H_user'*H_user; %transmit
-            T3{j} = T3{j} + trace(H_user*H_user'); %receive
-            T4{j} = T4{j} + trace(H_user'*H_user); %transmit
-            T5{j} = T5{j} + trace(H_user'*H_user); %SNR
+            H_receive = H_user*H_user';
+            H_transmit = H_user'*H_user;
+            T1{j} = T1{j} + H_receive; %receive
+            T2{j} = T2{j} + H_transmit; %transmit
+            T3{j} = T3{j} + trace(H_receive); %receive
+            T4{j} = T4{j} + trace(H_transmit); %transmit
+            T5{j} = T5{j} + trace(H_transmit); %SNR
         end
     end
+    STA_Info(tx).Channel_record{ind_sym} = H_freq;
     STA_Info(tx).Precoder_record{ind_sym} = M;
 end
 
@@ -179,27 +184,35 @@ for k=1:1:length(rv)
     I = find(STA(:, 5)>0);
     for i=1:length(I)
         tx1 = I(i);
+        if ~isempty(STA_Info(tx).CoMP_coordinator)
+            if (ismember(tx1, STA_Info(tx).CoMP_coordinator))
+                if(ismember(tx1, STA_Info(rv(k)).cover_STA))
+                    continue;
+                end
+            end
+        end
         if tx1 == rv, continue; end
         if any(tx1 == tx), continue; end
         if (STA(tx1, 8) == 2) % tx1 transmits Data pkt
             if (STA(tx1, 3) == 0) % tx1 is an AP
                 temp_N_tx = length(STA_Info(tx1).Precoder_record{1}(:,1,1));
-                pr = pr + fc_cal_interference(tx1,rv(k),temp_N_tx,N_rx,freq,...
-                    Nsubcarrier,Pt,channel_model,Bandwidth,Thermal_noise,...
+                pr = pr + fc_cal_interference(tx1,rv(k),temp_N_tx,N_rx,Nsym,freq,...
+                    Nsubcarrier,STA(tx1,5),channel_model,Bandwidth,Thermal_noise,...
                     tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
             else % tx1 is a non-AP STA
                 %Donot have uplink
             end
-        else % tx transmits RTS/CTS/ACK pkt, do not care # of antennas
-            pr = pr + fc_cal_interference(tx1,rv(k),1,N_rx,freq,...
-                Nsubcarrier,Pt,channel_model,Bandwidth,Thermal_noise,...
+        elseif (control_intf_skip_Debug == 0) % tx transmits RTS/CTS/ACK pkt, do not care # of antennas
+            pr = pr + fc_cal_interference(tx1,rv(k),1,N_rx,Nsym,freq,...
+                Nsubcarrier,STA(tx1,5),channel_model,Bandwidth,Thermal_noise,...
                 tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
         end
     end
     MCS_init = 7;
     T5{k} = T5{k}/Nsym;
     %SNR=(1/Nsubcarrier)*Pt*abs(t5)/(Nt*Nr*Thermal_noise);  %abs is needed?
-    T5{k} = (1/Nsubcarrier)*Pt*T5{k}/(N_tx*N_rx*Thermal_noise)+pr;
+    %T5{k} =(1/Nsubcarrier)*Pt*T5{k}*(1/(N_tx*N_rx))/(Thermal_noise+pr);
+    T5{k} = (1/(Nsubcarrier*N_rx))*Pt*T5{k}*(1/N_tx)/(Thermal_noise+pr);
     snr_dB(k)=10*log10(T5{k});
     gamma = T5{k};
     R_corr = abs(T1{k})/(abs((T3{k}))/N_rx); % receive spatial correlation matrix

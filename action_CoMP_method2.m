@@ -11,7 +11,7 @@
 % action.m include PHY and MAC layers,
 % Consecutive RTS CoMP prtocols
 
-function [NewEvents] = action_CoMP_method1(event,PHY_CH_module,Nsubcarrier,channel_model,Bandwidth,Thermal_noise,tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,AI,select_user)
+function [NewEvents] = action_CoMP_method2(event,PHY_CH_module,Nsubcarrier,channel_model,Bandwidth,Thermal_noise,tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,AI,select_user)
 % parameter.m
 global event_Debug detail_Debug MIMO_Debug queue_Debug powercontrol_Debug control_frame_Debug sounding_skipevent_Debug;
 global Num_Tx Num_Rx;
@@ -339,10 +339,7 @@ switch event.type
                 backoff_counter(i) = 0;
                 CoMP_Controller.information(i).numInform = 0;
                 if (any(CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1))
-                    TempEvent = event;
-                    TempEvent.type = 'MUNDP_response';
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
+                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
                 else
                     FirstCoMPAP = CoMP_Controller.information(i).startorder(1);
                     TempEvent = event;
@@ -358,33 +355,13 @@ switch event.type
                 backoff_counter(i) = 0;
                 CoMP_Controller.information(i).numInform = 0;
                 if (CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1)
-                    TempEvent = event;
-                    TempEvent.type = 'MUNDP_response';
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
                 end
                 if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
             elseif (strcmp(event.pkt.type, 'NDP_Ann') == 1)
-                FirstAP = CoMP_Controller.information(i).startorder(1);
                 backoff_counter(i) = 0;
                 CoMP_Controller.information(i).numInform = 0;
-                if CoMP_Controller.information(FirstAP).readyRTS == 1
-                    if sounding_skipevent_Debug == 0
-                        TempEvent = event;
-                        TempEvent.timer = t;
-                        TempEvent.type = 'send_PHY';
-                        TempEvent.STA_ID = i;
-                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' start sounding because STA ' num2str(FirstAP) ' readyRTS == 1']); end
-                    else
-                        TempEvent = event;
-                        TempEvent.timer = t + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
-                            (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime)+eps;
-                        TempEvent.type = 'CBF_timeout';
-                        TempEvent.STA_ID = i;
-                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' start sounding because STA ' num2str(FirstAP) ' readyRTS == 1']); end
-                    end
-                end
+                if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
             end
         else
             if (STA(i, 6) == 0 && carrier_sense(i) == 0 && t >= nav(i).end && STA(i, 7) == 0)
@@ -422,10 +399,7 @@ switch event.type
                 backoff_counter(i) = 0;
                 CoMP_Controller.information(i).numInform = 0;
                 if (CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1)
-                    TempEvent = event;
-                    TempEvent.type = 'MUNDP_response';
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
+                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
                 else
                     FirstCoMPAP = CoMP_Controller.information(i).startorder(1);
                     TempEvent = event;
@@ -441,33 +415,13 @@ switch event.type
                 backoff_counter(i) = 0;
                 CoMP_Controller.information(i).numInform = 0;
                 if (CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1)
-                    TempEvent = event;
-                    TempEvent.type = 'MUNDP_response';
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
                 end
                 if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
             elseif (strcmp(event.pkt.type, 'NDP_Ann') == 1)
-                FirstAP = CoMP_Controller.information(i).startorder(1);
                 backoff_counter(i) = 0;
                 CoMP_Controller.information(i).numInform = 0;
-                if CoMP_Controller.information(FirstAP).readyRTS == 1
-                    if sounding_skipevent_Debug == 0
-                        TempEvent = event;
-                        TempEvent.timer = t;
-                        TempEvent.type = 'send_PHY';
-                        TempEvent.STA_ID = i;
-                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' start sounding because STA ' num2str(FirstAP) ' readyRTS == 1']); end
-                    else
-                        TempEvent = event;
-                        TempEvent.timer = t + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
-                            (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime)+eps;
-                        TempEvent.type = 'CBF_timeout';
-                        TempEvent.STA_ID = i;
-                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' start sounding because STA ' num2str(FirstAP) ' readyRTS == 1']); end
-                    end
-                end
+                if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
             end
         else
             if (STA(i, 6) == 0 && carrier_sense(i) == 0 && t >= nav(i).end && STA(i, 7) == 0)
@@ -540,20 +494,30 @@ switch event.type
                                             error 'error pkt.type, when backoff == 0 in CoMP mode';
                                         end
                                     else % STA_Info(i).CoMP_coordinator's readyRTS ~= 1
-                                        TempEvent = event;
-                                        TempEvent.type = 'MUNDP_response';
-                                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                                        for k=1:length(CoMP_Controller.information(i).startorder)
+                                            CoMPAP_index = CoMP_Controller.information(i).startorder(k);
+                                            TempEvent = event;
+                                            TempEvent.type = 'CBF_timeout';
+                                            TempEvent.pkt = CoMP_Controller.information(CoMPAP_index).pkt;
+                                            TempEvent.timer = t + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
+                                            (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime)+eps;
+                                            TempEvent.STA_ID = CoMPAP_index;
+                                            NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                                        end
+                                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' send NDP_Ann.']); end
                                     end
                                 else % CoMP_Controller.information(i).readyRTS ~= 1
-                                    if sounding_skipevent_Debug == 0
-                                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                                    else
+                                    for k=1:length(CoMP_Controller.information(i).startorder)
+                                        CoMPAP_index = CoMP_Controller.information(i).startorder(k);
+                                        TempEvent = event;
                                         TempEvent.type = 'CBF_timeout';
+                                        TempEvent.pkt = CoMP_Controller.information(CoMPAP_index).pkt;
                                         TempEvent.timer = t + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
                                             (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime)+eps;
+                                        TempEvent.STA_ID = CoMPAP_index;
                                         NewEvents = [NewEvents, TempEvent]; clear TempEvent;
                                     end
-                                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' is ready to send ' num2str(event.pkt.type) '.']); end
+                                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
                                 end
                             end
                         elseif (STA(i, 3) == 0 && event.pkt.CoMP == 0)
@@ -625,10 +589,7 @@ switch event.type
                 backoff_counter(i) = 0;
                 CoMP_Controller.information(i).numInform = 0;
                 if (CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1)
-                    TempEvent = event;
-                    TempEvent.type = 'MUNDP_response';
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
+                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
                 else
                     FirstCoMPAP = CoMP_Controller.information(i).startorder(1);
                     TempEvent = event;
@@ -644,33 +605,13 @@ switch event.type
                 backoff_counter(i) = 0;
                 CoMP_Controller.information(i).numInform = 0;
                 if (CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1)
-                    TempEvent = event;
-                    TempEvent.type = 'MUNDP_response';
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
                 end
                 if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
             elseif (strcmp(event.pkt.type, 'NDP_Ann') == 1)
-                FirstAP = CoMP_Controller.information(i).startorder(1);
                 backoff_counter(i) = 0;
                 CoMP_Controller.information(i).numInform = 0;
-                if CoMP_Controller.information(FirstAP).readyRTS == 1
-                    if sounding_skipevent_Debug == 0
-                        TempEvent = event;
-                        TempEvent.timer = t;
-                        TempEvent.type = 'send_PHY';
-                        TempEvent.STA_ID = i;
-                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' start sounding because STA ' num2str(FirstAP) ' readyRTS == 1']); end
-                    else
-                        TempEvent = event;
-                        TempEvent.timer = t + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
-                            (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime)+eps;
-                        TempEvent.type = 'CBF_timeout';
-                        TempEvent.STA_ID = i;
-                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' start sounding because STA ' num2str(FirstAP) ' readyRTS == 1']); end
-                    end
-                end
+                if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
             end
         else
             if (STA(i, 6) == 0 && carrier_sense(i) == 0 && t >= nav(i).end && STA(i, 7) == 0)
@@ -737,21 +678,30 @@ switch event.type
                                         error 'error pkt.type, when backoff == 0 in CoMP mode';
                                     end
                                 else
-                                    
-                                    TempEvent = event;
-                                    TempEvent.type = 'MUNDP_response';
-                                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                                    for k=1:length(CoMP_Controller.information(i).startorder)
+                                        CoMPAP_index = CoMP_Controller.information(i).startorder(k);
+                                        TempEvent = event;
+                                        TempEvent.type = 'CBF_timeout';
+                                        TempEvent.pkt = CoMP_Controller.information(CoMPAP_index).pkt;
+                                        TempEvent.timer = t + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
+                                            (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime)+eps;
+                                        TempEvent.STA_ID = CoMPAP_index;
+                                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                                    end
+                                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' send NDP_Ann.']); end
                                 end
                             else
-                                if sounding_skipevent_Debug == 0
-                                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                                else
+                                for k=1:length(CoMP_Controller.information(i).startorder)
+                                    CoMPAP_index = CoMP_Controller.information(i).startorder(k);
+                                    TempEvent = event;
                                     TempEvent.type = 'CBF_timeout';
+                                    TempEvent.pkt = CoMP_Controller.information(CoMPAP_index).pkt;
                                     TempEvent.timer = t + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
                                         (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime)+eps;
+                                    TempEvent.STA_ID = CoMPAP_index;
                                     NewEvents = [NewEvents, TempEvent]; clear TempEvent;
                                 end
-                                if detail_Debug, disp(['  -D: STA ' num2str(i) ' is ready to send ' num2str(event.pkt.type) '.']); end
+                                if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
                             end
                         end
                     elseif (STA(i, 3) == 0 && event.pkt.CoMP == 0)
@@ -1523,30 +1473,6 @@ switch event.type
                 TempEvent.timer = t + eps;
                 TempEvent.type = 'MUNDP_response';
                 NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                NextAP = i;
-                while (CoMP_Controller.information(NextAP).startorder(end) ~= NextAP )
-                    NextAP = CoMP_Controller.information(NextAP).startorder(find(NextAP == CoMP_Controller.information(NextAP).startorder)+1);
-                    if(CoMP_Controller.information(NextAP).readyRTS ~= 1)
-                        if sounding_skipevent_Debug == 0
-                            TempEvent = event;
-                            TempEvent.type = 'send_PHY';
-                            TempEvent.STA_ID = NextAP;
-                            TempEvent.timer = t + SIFS - eps;
-                            TempEvent.pkt = CoMP_Controller.information(NextAP).pkt;
-                            NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                            break;
-                        else
-                            TempEvent = event;
-                            TempEvent.type = 'CBF_timeout';
-                            TempEvent.STA_ID = NextAP;
-                            TempEvent.timer = t + SIFS + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
-                                            (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime);
-                            TempEvent.pkt = CoMP_Controller.information(NextAP).pkt;
-                            NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                            break;
-                        end
-                    end
-                end
             else
                 if (STA_Info(i).nextsounding == STA_Info(i).soundingqueue(1))
                     STA_Info(i).report_ptimes = STA_Info(i).report_ptimes + 1;

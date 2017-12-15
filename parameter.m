@@ -11,7 +11,7 @@
 % Parameters from CoMP_sim
 global Num_AP Num_User;
 % Debug parameters
-global event_Debug detail_Debug power_Debug MIMO_Debug queue_Debug powercontrol_Debug control_frame_Debug;
+global event_Debug detail_Debug power_Debug MIMO_Debug queue_Debug powercontrol_Debug control_frame_Debug sounding_skipevent_Debug control_intf_skip_Debug;
 % some distances for making decision
 global all_STA_distance;
 global def_CoMP_L cover_range;
@@ -39,10 +39,14 @@ global DebugDataTime DebugBOTime soundingIndex;
 global Pr_edge;  %added by jing-wen
 global ClusterSize; %add by jing-wen
 global Max_Report_P; %add by jing-wen
-global skip_cal_MCS_sp_Debug %add by jing-wen
 global PHY_CH_module;
 global num_msdu;
 global spatial_stream;
+global ComputerCore;
+% ========== New for CoMP parameter ==========
+% ComputerCore = 3;   %The core number for parallel computing
+% parpool('local',ComputerCore);
+% ============================================
 % ========== New for CoMP parameter ==========
 Max_Report_P = 3; %added by jing-wen
 ClusterSize = 3; %added by jing-wen (not yet)
@@ -82,9 +86,10 @@ detail_Debug = 1;
 power_Debug = 0;
 MIMO_Debug = 0;
 queue_Debug = 0;
-powercontrol_Debug = 0; % added by jing-wen
-control_frame_Debug = 0; %added by jing-wen, Make control frame packet error rate = 0;
-skip_cal_MCS_sp_Debug = 1;    %added by jing-wen, STA return CBF when it has new enough CSI, do not cal MCS for save time;
+sounding_skipevent_Debug = 1; %added by jing-wen
+control_intf_skip_Debug = 1; %added by jing-wen
+powercontrol_Debug = 0;  %added by jing-wen
+control_frame_Debug = 1; %added by jing-wen, Make control frame packet error rate = 0
 
 % ==== AP+User to AP+User distances ====
 all_STA_distance = zeros(numSTAs, numSTAs); % Distances of (APs+Users) by (APs+Users), unit meter 
@@ -98,7 +103,7 @@ cover_range = 50; % unit meter
 
 % =========== PHY parameters ===========
 % Antenna size
-Num_Tx = 6;
+Num_Tx = 4;
 Num_Rx = 2;
 
 if select_algo == 1
