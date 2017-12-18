@@ -22,13 +22,15 @@
 %   wall_mix,wall_index,HOV,room_range
 %   pkt_size_in_bits
 
-function [MCS_index,snr_dB] = fc_return_MCS_Int(target_PER,tx,rv,N_tx,N_rx,freq,...
+function [MCS_index,snr_dB] = fc_return_MCS_Int(t,target_PER,tx,rv,N_tx,N_rx,freq,...
     Nsubcarrier,Pt,channel_model,Bandwidth,Thermal_noise,...
-    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range, L,tempindex_AI)
+    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range, L,tempindex_AI,pkt_type)
 
 global STA STA_Info;
 global per_order;
+global GI SymbolTime;
 global control_intf_skip_Debug;
+global tx_interval;
 
 tx_x_pos=STA(tx, 1);
 tx_y_pos=STA(tx, 2);
@@ -37,7 +39,8 @@ rx_y_pos=[STA(rv, 2)'];
 N_tx = N_rx*length(rv);
 signal_power=0;
 WiFi_standard='80211ac';
-Nsym=10^3;
+Nsym = num_symbol(pkt_type,L);
+time = tx_interval(tx).end;
 tempindex_1=11;
 tempindex_2=11;
 tempindex_3=11;
@@ -81,20 +84,6 @@ Thermal_noise = 1*1.38*10^(-23)*Temperature*Bandwidth;
 %     Bandwidth=40*10^6;           % Bandwidth in Hz
 Samping_rate_expansion_factor=fc_give_channel_sampling_rate_expantion_factor(Bandwidth);
 % ===== Environment parameters ===== %
-
-t1 = zeros(N_rx,N_rx); %receive correlation
-t2 = zeros(N_rx,N_rx); %transmit correlation
-t3 = 0; %receive correlation normalize
-t4 = 0; %transmit correlation normalize
-t5 = 0; %SNR
-
-for k=1:length(rv)
-    T1{k} = t1;
-    T2{k} = t2;
-    T3{k} = t3;
-    T4{k} = t4;
-    T5{k} = t5;
-end
 
 for k=1:1:length(rv)
     % ============== Retrieving AoDs and Traveling distances ============ %
@@ -140,6 +129,29 @@ for k=1:1:length(rv)
     % ======================== End of getting AS ======================== %
 end
 
+t1 = zeros(N_rx,N_rx); %receive correlation
+t2 = zeros(N_rx,N_rx); %transmit correlation
+t3 = 0; %receive correlation normalize
+t4 = 0; %transmit correlation normalize
+t5 = 0; %Singal
+
+for k=1:length(rv)
+    T1{k} = t1;
+    T2{k} = t2;
+    T3{k} = t3;
+    T4{k} = t4;
+    T5{k} = [];
+end
+for ind_sym=1:1:Nsym
+    for index_f=1:1:Nsubcarrier
+        T5{k}{ind_sym}{index_f} = t5;
+    end
+end
+
+
+SINR = zeros(length(rv),Nsym,Nsubcarrier);
+for k=1:length(rv), pr{k}=zeros(Nsym,Nsubcarrier); end
+
 for ind_sym=1:1:Nsym
     h_temp=zeros(N_tx*N_rx,Nsubcarrier);
     for k=1:1:length(rv)
@@ -163,7 +175,10 @@ for ind_sym=1:1:Nsym
             nown_stream = all_stream(~ismember(all_stream, own_stream));
             M(:,own_stream,index_f) = null(H_freq(nown_stream,:,index_f));
         end
-        H_new(:,:,index_f)=H_freq(:,:,index_f)*M(:,:,index_f);
+        STA_Info(tx).Channel_record{ind_sym}{index_f} = H_freq(:,:,index_f);
+        H_new(:,:,index_f)=H_freq(:,:,index_f);%*M(:,:,index_f);
+        STA_Info(tx).Precoder_record{ind_sym}{index_f} = M(:,:,index_f);
+        
         for j=1:length(rv)
             H_user = H_new((j-1)*N_rx+1:1:(j-1)*N_rx+N_rx,(j-1)*N_rx+1:1:(j-1)*N_rx+N_rx,index_f);
             H_receive = H_user*H_user';
@@ -172,49 +187,62 @@ for ind_sym=1:1:Nsym
             T2{j} = T2{j} + H_transmit; %transmit
             T3{j} = T3{j} + trace(H_receive); %receive
             T4{j} = T4{j} + trace(H_transmit); %transmit
-            T5{j} = T5{j} + trace(H_transmit); %SNR
+            T5{j}{ind_sym}{index_f} = trace(H_transmit); %SNR
         end
     end
-    STA_Info(tx).Channel_record{ind_sym} = H_freq;
-    STA_Info(tx).Precoder_record{ind_sym} = M;
-end
-
-for k=1:1:length(rv)
-    pr = 0;
-    I = find(STA(:, 5)>0);
-    for i=1:length(I)
-        tx1 = I(i);
-        if ~isempty(STA_Info(tx).CoMP_coordinator)
-            if (ismember(tx1, STA_Info(tx).CoMP_coordinator))
-                if(ismember(tx1, STA_Info(rv(k)).cover_STA))
-                    continue;
+    for k=1:length(rv)
+        for j=1:length(tx_interval)
+            if(time > tx_interval(j).start && time <= tx_interval(j).end)
+                tx1 = j;
+                if ~isempty(STA_Info(tx).CoMP_coordinator)
+                    if (ismember(tx1, STA_Info(tx).CoMP_coordinator))
+                        if(ismember(tx1, STA_Info(rv(k)).cover_STA))
+                            continue;
+                        end
+                    end
+                end
+                if tx1 == rv, continue; end
+                if any(tx1 == tx), continue; end
+                if (STA(tx1, 8) == 2) % tx1 transmits Data pkt
+                    if (STA(tx1, 3) == 0) % tx1 is an AP
+                        temp_N_tx = length(STA_Info(tx1).Precoder_record{1}(:,1,1));
+                        pr{k}(ind_sym,:) = pr{k}(ind_sym,:) + fc_cal_interference(ind_sym,tx1,rv(k),temp_N_tx,N_rx,Nsym,freq,...
+                            Nsubcarrier,STA(tx1,5),channel_model,Bandwidth,Thermal_noise,...
+                            tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
+                    else % tx1 is a non-AP STA
+                        pr{k}(ind_sym,:) = pr{k}(ind_sym,:) + fc_cal_interference(ind_sym,tx1,rv(k),1,N_rx,Nsym,freq,...
+                            Nsubcarrier,STA(tx1,5),channel_model,Bandwidth,Thermal_noise,...
+                            tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
+                    end
+                elseif (control_intf_skip_Debug == 0) % tx transmits RTS/CTS/ACK pkt, do not care # of antennas
+                    pr{k}(ind_sym,:) = pr{k}(ind_sym,:) + fc_cal_interference(ind_sym,tx1,rv(k),1,N_rx,Nsym,freq,...
+                        Nsubcarrier,STA(tx1,5),channel_model,Bandwidth,Thermal_noise,...
+                        tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
                 end
             end
         end
-        if tx1 == rv, continue; end
-        if any(tx1 == tx), continue; end
-        if (STA(tx1, 8) == 2) % tx1 transmits Data pkt
-            if (STA(tx1, 3) == 0) % tx1 is an AP
-                temp_N_tx = length(STA_Info(tx1).Precoder_record{1}(:,1,1));
-                pr = pr + fc_cal_interference(tx1,rv(k),temp_N_tx,N_rx,Nsym,freq,...
-                    Nsubcarrier,STA(tx1,5),channel_model,Bandwidth,Thermal_noise,...
-                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
-            else % tx1 is a non-AP STA
-                %Donot have uplink
-            end
-        elseif (control_intf_skip_Debug == 0) % tx transmits RTS/CTS/ACK pkt, do not care # of antennas
-            pr = pr + fc_cal_interference(tx1,rv(k),1,N_rx,Nsym,freq,...
-                Nsubcarrier,STA(tx1,5),channel_model,Bandwidth,Thermal_noise,...
-                tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
+    end
+    for k=1:length(rv)
+        for index_f=1:1:Nsubcarrier
+            SINR(k,ind_sym,index_f) = (1/(N_tx*N_rx))*Pt*T5{k}{ind_sym}{index_f}/(Thermal_noise+pr{k}(ind_sym,index_f));
         end
     end
+    time = time - SymbolTime(GI);
+end
+SINR_per_f = zeros(length(rv),ind_sym);
+final_SINR = zeros(1,length(rv));
+for k=1:length(rv)
+    for ind_sym=1:1:Nsym
+        SINR_per_f(k,ind_sym) = sum(SINR(k,ind_sym,:))/Nsubcarrier;
+    end
+    final_SINR(k) = sum(SINR_per_f(k,:))/Nsym;
+end
+
+snr_dB = zeros(1,length(rv));
+for k=1:1:length(rv)
     MCS_init = 7;
-    T5{k} = T5{k}/Nsym;
-    %SNR=(1/Nsubcarrier)*Pt*abs(t5)/(Nt*Nr*Thermal_noise);  %abs is needed?
-    %T5{k} =(1/Nsubcarrier)*Pt*T5{k}*(1/(N_tx*N_rx))/(Thermal_noise+pr);
-    T5{k} = (1/(Nsubcarrier*N_rx))*Pt*T5{k}*(1/N_tx)/(Thermal_noise+pr);
-    snr_dB(k)=10*log10(T5{k});
-    gamma = T5{k};
+    snr_dB(k)=10*log10(final_SINR(k));
+    gamma = final_SINR(k);
     R_corr = abs(T1{k})/(abs((T3{k}))/N_rx); % receive spatial correlation matrix
     S_corr = abs(T2{k})/(abs((T4{k}))/(1/length(rv)*N_tx)); % transmit spatial correlation matrix
     eig_Value = eig(R_corr).';

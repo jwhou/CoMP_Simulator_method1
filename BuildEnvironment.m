@@ -32,36 +32,36 @@ area_Y = area_array(2);
 Heterogeneous = 1; % [1:802.11ac + 802.11ad , 2: 802.11ad + LTE , 3:802.11ad ]
 
 if(AP_distribution == -2)
-    Num_AP = 2;
+    Num_AP = 1;
     AP_location = [
-         50,50; % AP1
-        105,50; % AP2
-%           50,110; % AP3
-%           105,110; % AP4
+          50,50; % AP1
+%         105,50; % AP2
+%            50,110; % AP3
+%            105,110; % AP4
         ];
     if (User_distribution == -2)
         User_location = [
-              40,50;
-              50,40;
-             50,60;
-%               60,50;
-%                
+%              40,50;
+%               50,40;
+%              50,60;
+              60,50;
+               
 %                95,50;
-              105,40;
-              105,60 
-               115,50;
-              
+%               105,40;
+%               105,60 
+%                 115,50;
+%               
 %               40,110;
 %               50,100;
 %               50,120;
-% %               60,110;
-% %                
-% %               95,110;
+%               60,110;
+%                
+%               95,110;
 %               105,100;
 %               105,120 
 %               115,110;
             ];
-          NumUser = 6;
+          NumUser = 1;
     end
 
 
@@ -210,7 +210,9 @@ rx_x_pos = User_location(:,1);
 rx_y_pos = User_location(:,2);
 
 XY_location = [AP_location; User_location];
-wall_start=[0   0;ceil(max(XY_location(:, 1))/cover_range)*cover_range 0;ceil(max(XY_location(:, 1))/cover_range)*cover_range ceil(max(XY_location(:, 1))/cover_range)*cover_range;0 ceil(max(XY_location(:, 1))/cover_range)*cover_range];
-wall_end  =[ceil(max(XY_location(:, 2))/cover_range)*cover_range  0;ceil(max(XY_location(:, 2))/cover_range)*cover_range ceil(max(XY_location(:, 2))/cover_range)*cover_range;0 ceil(max(XY_location(:, 2))/cover_range)*cover_range;0 0];
+wall_start = [0 0;100 0; 100 100; 0 100];
+wall_end = [100 0; 100 100; 0 100; 0 0];
+% wall_start=[0   0;ceil(max(XY_location(:, 1))/cover_range)*cover_range 0;ceil(max(XY_location(:, 1))/cover_range)*cover_range ceil(max(XY_location(:, 2))/cover_range)*cover_range;0 ceil(max(XY_location(:, 2))/cover_range)*cover_range];
+% wall_end  =[ceil(max(XY_location(:, 1))/cover_range)*cover_range  0;ceil(max(XY_location(:, 1))/cover_range)*cover_range ceil(max(XY_location(:, 2))/cover_range)*cover_range;0 ceil(max(XY_location(:, 2))/cover_range)*cover_range;0 0];
 end
 

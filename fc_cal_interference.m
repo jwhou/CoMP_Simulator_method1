@@ -4,7 +4,7 @@
 % Version   : 0.9
 % Date      : 2017/12/8
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function [pr] = fc_cal_interference(tx,rv,N_tx,N_rx,Nsym,freq,...
+function [pr] = fc_cal_interference(ind_sym,tx,rv,N_tx,N_rx,Nsym,freq,...
     Nsubcarrier,Pt,channel_model,Bandwidth,Thermal_noise,...
     tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI )
 
@@ -59,8 +59,6 @@ Thermal_noise = 1*1.38*10^(-23)*Temperature*Bandwidth;
 Samping_rate_expansion_factor=fc_give_channel_sampling_rate_expantion_factor(Bandwidth);
 % ===== Environment parameters ===== %
 
-t5 = 0; %Interference
-
 % ============== Retrieving AoDs and Traveling distances ============ %
 % [AoAAoD,Ncluster,distance,index,wall_in_count,collision_in_count]=fc_cal_main_path(...
 %     channel_type,collision_times,wall_mix,wall_index,HOV,tx,ty,rx,ry,room_range);
@@ -103,32 +101,30 @@ angular=fc_cal_angular_spread(wall_mix,wall_index,HOV,tx_x_pos,tx_y_pos,rx_x_pos
     channel_model,AoD_in_count,wall_in_count,Ncluster,reflection_times,collision_in_count);
 % ======================== End of getting AS ======================== %
 
-for ind_sym=1:1:Nsym
-    
-    % generating the channel coefficients in time and frequency domain
-    h_time=fc_generate_h(Nsubcarrier,N_tx,N_rx,channel_model,AoD_in_floor,...
-        Samping_rate_expansion_factor,PL_dB_in_count,ant_gain,Ncluster,angular);
-    
-    h_temp=zeros(size(h_time));
-    for ind=1:1:N_tx*N_rx
-        h_temp(ind,:)=fft(h_time(ind,:),Nsubcarrier)/sqrt(Nsubcarrier);
-    end
-    
-    H_new=zeros(N_rx,N_tx,Nsubcarrier);
-    H_freq=zeros(N_rx,N_tx,Nsubcarrier);
-    for index_f=1:1:Nsubcarrier
-        H_freq(:,:,index_f)=reshape(h_temp(:,index_f),N_rx,N_tx);
-        if N_tx == 1
-            t5 = t5 + trace(H_freq(:,:,index_f)'*H_freq(:,:,index_f)); %SNR
-        else
-            H_new(:,:,index_f)=H_freq(:,:,index_f)*STA_Info(tx).Precoder_record{ind_sym}(:,:,index_f);
-            t5 = t5 + trace(H_new(:,:,index_f)'*H_new(:,:,index_f)); %SNR
-        end
-    end
+% generating the channel coefficients in time and frequency domain
+h_time=fc_generate_h(Nsubcarrier,N_tx,N_rx,channel_model,AoD_in_floor,...
+    Samping_rate_expansion_factor,PL_dB_in_count,ant_gain,Ncluster,angular);
+
+h_temp=zeros(size(h_time));
+for ind=1:1:N_tx*N_rx
+    h_temp(ind,:)=fft(h_time(ind,:),Nsubcarrier)/sqrt(Nsubcarrier);
 end
 
-t5 = t5 / Nsym;
-pr = (1/Nsubcarrier)*(Pt*t5)/(N_tx);
+H_new=zeros(N_rx,N_tx,Nsubcarrier);
+H_freq=zeros(N_rx,N_tx,Nsubcarrier);
+t5 = zeros(1,Nsubcarrier);
+pr = zeros(1,Nsubcarrier);
+for index_f=1:1:Nsubcarrier
+    H_freq(:,:,index_f)=reshape(h_temp(:,index_f),N_rx,N_tx);
+    if N_tx == 1
+        t5(index_f) = trace(H_freq(:,:,index_f)'*H_freq(:,:,index_f)); %SNR
+    else
+        H_new(:,:,index_f)=H_freq(:,:,index_f)*STA_Info(tx).Precoder_record{ind_sym}{index_f};
+        t5(index_f) = trace(H_new(:,:,index_f)'*H_new(:,:,index_f)); %SNR
+    end
+    pr(index_f) = (Pt*t5(index_f))/(N_tx*N_rx);
+end
+
 end
 
 

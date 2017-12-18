@@ -30,6 +30,8 @@ global basic_rate ACK_tx_time CTS_tx_time RTS_tx_time CW_min CW_max;
 global backoff_counter backoff_attempt nav packet_id pending_id;
 % Other parameters
 global traffic_queue mac_status queue_size soundingperiod;
+global tx_interval;  %added by jing-wen
+global interference_queue;  %added by jing-wen
 % Statics parameters
 global statics_rv_bits;
 global DataSentSucceessed DataSent DataSentFailNotRx DataSentFailNoACK; 
@@ -319,10 +321,12 @@ CW_max = 10; % 1023 = 2^10-1
 backoff_counter = zeros(numSTAs, 1);
 backoff_attempt = zeros(numSTAs, 1);
 nav = []; for i=1:numSTAs, nav(i).start=0; nav(i).end=0; end
+tx_interval = []; for i=1:numSTAs, tx_interval(i).start=0; tx_interval(i).end=0; end
 packet_id = zeros(numSTAs, 1); % id for next MAC or NET packet
 pending_id = zeros(numSTAs, 1); % id of current transmitting MAC packet, used for timeout
 % ========= Other parameters ==========
 traffic_queue = []; for i=1:Num_AP, traffic_queue(i).list = []; traffic_queue(i).size = [];end % Traffic queue for AP because non-AP STA only transmits to the associated AP
+interference_queue = []; for i=1:numSTAs, interference_queue(i).list = []; interference_queue(i).start = []; interference_queue(i).end = []; interference_queue(i).pkt_type = [];end 
 mac_status = []; for i=1:numSTAs, mac_status(i) = 0; end % Distinguish whether a traffic going medium access control or not
 queue_size = []; for i=1:numSTAs, queue_size(i) = 0; end % Size of each STA traffic queue
 soundingperiod = 50*1e-3; % 50 ms

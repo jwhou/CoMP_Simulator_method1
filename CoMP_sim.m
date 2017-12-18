@@ -24,7 +24,7 @@ global RTS_method;
 global lastsounding_enable;
 
 % scheme_quantity = [1,2,3];
-scheme_quantity = [1,2]; % testing by shuyu 
+scheme_quantity = [2]; % testing by shuyu 
 RTS_method = 0; %testing by jing-wen  0: no RTS, 1: Typical RTS, 2: RTS Simultaneously
 lastsounding_enable = 0; %testing by jing-wen  0: no record, 1: record
 run_quantity = [1];

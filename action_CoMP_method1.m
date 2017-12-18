@@ -38,6 +38,8 @@ global cover_range;
 global Max_Report_P;
 global num_msdu;
 global spatial_stream;
+global tx_interval; % added by jing-wen
+global interference_queue; % added by jing-wen
 
 NewEvents = [];
 
@@ -833,6 +835,7 @@ switch event.type
             otherwise
                 error (['send_PHY wrong txtime. STA ' num2str(i) ' is sending ' num2str(event.pkt.type)])
         end
+        
             
         if (STA(i, 6) == 0  && (nav(i).start > (t+txtime) || nav(i).end < t) ) % idle and no nav
 
@@ -842,6 +845,23 @@ switch event.type
             % Setting I:
             STA(i, 6) = 1; % Switch to transmit mode, assume RXTXturnaround time is zero
             STA(i, 5) = event.pkt.power; % STA(i, 5) is the power STA i uses
+            tx_interval(i).start = t;
+            tx_interval(i).end = t + txtime;
+%             I = find(STA(:, 5)>0);
+%             for k=1:length(I)
+%                 tx1 = I(i);
+%                 if any(tx1 == j), continue; end
+%                 if any(tx1 == i), continue; end
+%                 interference_queue(i).list = [interference_queue(i).list tx1];
+%                 interference_queue(i).start = [interference_queue(i).start tx_interval(tx1).start];
+%                 interference_queue(i).end = [interference_queue(i).end tx_interval(tx1).end];
+%                 interference_queue(i).pkt_type = [interference_queue(i).pkt_type STA(tx1, 8)];
+%                 
+%                 interference_queue(tx1).list = [interference_queue(tx1).list i];
+%                 interference_queue(tx1).start = [interference_queue(tx1).start tx_interval(i).start];
+%                 interference_queue(tx1).end = [interference_queue(tx1).end tx_interval(i).end];
+%                 interference_queue(tx1).pkt_type = [interference_queue(tx1).pkt_type STA(i, 8)];
+%             end
             %disp([' STA power  ' num2str(STA(i,5))]);
             if (strcmp(event.pkt.type, 'Data') == 1)
                 % STA(i, 8) is to store the transmitting pkt category of STA i
@@ -1404,9 +1424,9 @@ switch event.type
         i = event.STA_ID;
         if (event.pkt.MU == 0 && event.pkt.CoMP == 0)
             if (isempty(STA_Info(i).soundingqueue))
-                [MCS_index,~] = fc_return_MCS_Int(per_order,i,event.pkt.Group, Num_Tx,spatial_stream,freq,...
+                [MCS_index,~] = fc_return_MCS_Int(t,per_order,i,event.pkt.Group, Num_Tx,spatial_stream,freq,...
                     Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI);
+                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI,'MAC_body');
                 if sounding_skipevent_Debug == 1
                     STA_Info(i).CSI_TS(event.pkt.Group - Num_AP) = t - eps;
                 end
@@ -1451,9 +1471,9 @@ switch event.type
         elseif (event.pkt.MU == 1 && event.pkt.CoMP == 0)
             
             if (isempty(STA_Info(i).soundingqueue))
-                [MCS_index,~] = fc_return_MCS_Int(per_order,i,event.pkt.Group, Num_Tx,spatial_stream,freq,...
+                [MCS_index,~] = fc_return_MCS_Int(t,per_order,i,event.pkt.Group, Num_Tx,spatial_stream,freq,...
                     Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI);
+                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI,'MAC_body');
                 if sounding_skipevent_Debug == 1
                     for k=1:length(event.pkt.Group)
                         sum_STA = length(event.pkt.Group);
@@ -1508,9 +1528,9 @@ switch event.type
                 end
             end
             if (isempty(STA_Info(i).soundingqueue))
-                [MCS_index,~] = fc_return_MCS_Int(per_order,i,event.pkt.CoMPGroup, Num_Tx,spatial_stream,freq,...
+                [MCS_index,~] = fc_return_MCS_Int(t,per_order,i,event.pkt.CoMPGroup, Num_Tx,spatial_stream,freq,...
                     Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI);
+                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI,'MAC_body');
                 if sounding_skipevent_Debug == 1
                     for k=1:length(event.pkt.CoMPGroup)
                         sum_STA = length(event.pkt.CoMPGroup);
@@ -1913,7 +1933,7 @@ switch event.type
                 case 'new'
                     if (strcmp(event.pkt.type, 'Data') == 1)
                         if (event.pkt.MU == 0 && event.pkt.CoMP == 0)
-                            [pr,snr, Prob] = fc_recv_phy(1,event.pkt.MCS_index, i,j, spatial_stream,spatial_stream,freq,...
+                            [pr,snr, Prob] = fc_recv_phy(t,1,event.pkt.MCS_index, i,j, spatial_stream,spatial_stream,freq,...
                                                     Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
                                                     tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,event.pkt.size,AI,event.pkt.type);
                             %Prob = 0;
@@ -1922,7 +1942,7 @@ switch event.type
                                 Prob = 1;
                                 pr = 1;
                             else
-                                [pr,snr, Prob] = fc_recv_phy(find(j==event.pkt.Group),event.pkt.MCS_index(j==event.pkt.Group),i,j,length(event.pkt.Group)*spatial_stream,spatial_stream,freq,...
+                                [pr,snr, Prob] = fc_recv_phy(t,find(j==event.pkt.Group),event.pkt.MCS_index(j==event.pkt.Group),i,j,length(event.pkt.Group)*spatial_stream,spatial_stream,freq,...
                                                     Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
                                                     tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,event.pkt.size(j==event.pkt.Group),AI,event.pkt.type);
                                 %Prob = 0;
@@ -1932,7 +1952,7 @@ switch event.type
                                 Prob = 1;
                                 pr = 1;
                             else
-                                [pr,snr, Prob] = fc_recv_phy(find(j==event.pkt.CoMPGroup),event.pkt.MCS_index(j==event.pkt.CoMPGroup),i(i==STA(j,3)),j,length(event.pkt.Group)*spatial_stream,spatial_stream,freq,...
+                                [pr,snr, Prob] = fc_recv_phy(t,find(j==event.pkt.CoMPGroup),event.pkt.MCS_index(j==event.pkt.CoMPGroup),i(i==STA(j,3)),j,length(event.pkt.Group)*spatial_stream,spatial_stream,freq,...
                                                     Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
                                                     tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,event.pkt.size(j==event.pkt.CoMPGroup),AI,event.pkt.type);
                                 %    Prob = 0;
@@ -1943,30 +1963,30 @@ switch event.type
                         pr = 0;
                         Prob = 0;
                     elseif (strcmp(event.pkt.type, 'NDP_Ann') == 1)
-                        [pr,snr, Prob] = fc_recv_phy(1,MCS_ctrl, i,j, 1,1,freq,...
+                        [pr,snr, Prob] = fc_recv_phy(t,1,MCS_ctrl, i,j, 1,1,freq,...
                                                     Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
                                                     tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_NDP_Ann,AI,event.pkt.type);
                     elseif (strcmp(event.pkt.type, 'NDP') == 1)
                         pr = 0;
                         Prob = 0;
                     elseif (strcmp(event.pkt.type, 'Compressed_BF') == 1)
-                        [pr,snr, Prob] = fc_recv_phy(1,MCS_ctrl, i,j, 1,1,freq,...
+                        [pr,snr, Prob] = fc_recv_phy(t,1,MCS_ctrl, i,j, 1,1,freq,...
                                                     Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
                                                     tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_CVBFReport,AI,event.pkt.type);
                     elseif (strcmp(event.pkt.type, 'Report_P') == 1)
-                        [pr,snr, Prob] = fc_recv_phy(1,MCS_ctrl, i,j, 1,1,freq,...
+                        [pr,snr, Prob] = fc_recv_phy(t,1,MCS_ctrl, i,j, 1,1,freq,...
                                                     Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
                                                     tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_ReportPoll,AI,event.pkt.type);
                     elseif (strcmp(event.pkt.type, 'ACK') == 1)
-                        [pr,snr, Prob] = fc_recv_phy(1,MCS_ctrl, i,j, 1,1,freq,...
+                        [pr,snr, Prob] = fc_recv_phy(t,1,MCS_ctrl, i,j, 1,1,freq,...
                                                     Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
                                                     tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_BA,AI,event.pkt.type);
                     elseif (strcmp(event.pkt.type, 'RTS') == 1)
-                        [pr,snr, Prob] = fc_recv_phy(1,MCS_ctrl, i,j, 1,1,freq,...
+                        [pr,snr, Prob] = fc_recv_phy(t,1,MCS_ctrl, i,j, 1,1,freq,...
                                                     Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
                                                     tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_RTS,AI,event.pkt.type);
                     elseif (strcmp(event.pkt.type, 'CTS') == 1)
-                        [pr,snr, Prob] = fc_recv_phy(1,MCS_ctrl, i,j, 1,1,freq,...
+                        [pr,snr, Prob] = fc_recv_phy(t,1,MCS_ctrl, i,j, 1,1,freq,...
                                                     Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
                                                     tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_CTS,AI,event.pkt.type);
                     end

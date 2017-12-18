@@ -4,7 +4,7 @@
 % Version   : 0.9
 % Date      : 2017/11/25
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function Nsym = num_symbol(pkt_type)
+function Nsym = num_symbol(pkt_type,L)
 
 global GI SymbolTime;
 global Mode_AMPDU_AMSDU;
@@ -30,18 +30,11 @@ switch pkt_type
         Nsym = ceil((size_ReportPoll / basic_rate)/SymbolTime(GI));
     case 'Compressed_BF'
         Nsym = ceil((size_CVBFReport / basic_rate)/SymbolTime(GI));
+    case 'MAC_body'
+        Nsym = ceil((L / basic_rate)/SymbolTime(GI));
 	case 'Data'
-        Nsym = 1000;
-%         if (Mode_AMPDU_AMSDU == 0)
-%             % A-MPDU
-%             Delimeter = 4*8; % 4 Octects;
-%             FCS_size=4*8;
-%             Num_Aggr = pkt.size./ size_MAC_body/num_msdu;
-%             txtime =  txtime + ceil(max(((size_MAC_header+Delimeter+FCS_size)*Num_Aggr)/basic_rate+(pkt.size./pkt.rate))/SymbolTime(GI))*SymbolTime(GI);
-%         else
-%             % A-MSDU
-%             txtime = txtime + ceil(max((size_MAC_header+pkt.size)./pkt.rate)/SymbolTime(GI))*SymbolTime(GI);
-%         end
+        %Nsym = 1000;
+        Nsym = ceil((L /basic_rate)/SymbolTime(GI));
 	otherwise
 		disp(['num_symbol: wrong packet type: ' pkt.type]);		
 end

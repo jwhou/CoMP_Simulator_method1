@@ -1,14 +1,17 @@
 % Given the simulated room and the TX/RX position, this function returns
 % the received signal power and interference
 
-function [pr,snr_dB,final_PER] = fc_recv_phy(order,MCS,tx,rv,N_tx,N_rx,freq,...
+function [pr,snr_dB,final_PER] = fc_recv_phy(t,order,MCS,tx,rv,N_tx,N_rx,freq,...
     Nsubcarrier,Pt,channel_model,Bandwidth,Thermal_noise,...
     tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range, pkt_size_in_bits,tempindex_AI, pkt_type)
 
 
 global STA STA_Info;
 global CoMP_Controller;
+global GI SymbolTime;
 global control_intf_skip_Debug
+global tx_interval;
+global size_MAC_body;
 
 tx_x_pos=STA(tx, 1);
 tx_y_pos=STA(tx, 2);
@@ -16,8 +19,10 @@ rx_x_pos=STA(rv, 1);
 rx_y_pos=STA(rv, 2);
 WiFi_standard='80211ac';
 L = pkt_size_in_bits;
+time = tx_interval(tx).end;
 MCS_int=MCS-1; %decrease 1 for cope with simulator
-Nsym = num_symbol(pkt_type);  % number of OFDM symbols per packet
+Nsym = num_symbol(pkt_type,size_MAC_body);  % number of OFDM symbols per packet
+multi_symbol = ceil(num_symbol(pkt_type,L)/num_symbol(pkt_type,size_MAC_body));
 tempindex_1=11;
 tempindex_2=11;
 tempindex_3=11;
@@ -112,11 +117,20 @@ angular=fc_cal_angular_spread(wall_mix,wall_index,HOV,tx_x_pos,tx_y_pos,rx_x_pos
     channel_model,AoD_in_count,wall_in_count,Ncluster,reflection_times,collision_in_count);
 % ======================== End of getting AS ======================== %
 
-if (strcmp(pkt_type, 'Data') == 1)
-    for ind_sym=1:1:Nsym
+t5 = [];
+for ind_sym=1:1:Nsym
+    for index_f=1:1:Nsubcarrier
+        t5{ind_sym}{index_f} = 0;
+    end
+end
+
+SINR = zeros(Nsym,Nsubcarrier);
+pr = zeros(Nsym,Nsubcarrier);
+for ind_sym=1:1:Nsym
+    if (strcmp(pkt_type, 'Data') == 1)
         H_new = zeros(N_tx,N_tx,Nsubcarrier);
         for index_f=1:1:Nsubcarrier
-            H_new(:,:,index_f) = STA_Info(tx).Channel_record{ind_sym}(:,:,index_f)*STA_Info(tx).Precoder_record{ind_sym}(:,:,index_f);
+            H_new(:,:,index_f) =  STA_Info(tx).Channel_record{ind_sym}{index_f}*STA_Info(tx).Precoder_record{ind_sym}{index_f};
             H_user = H_new((order-1)*N_rx+1:1:(order-1)*N_rx+N_rx,(order-1)*N_rx+1:1:(order-1)*N_rx+N_rx,index_f);
             H_receive = H_user*H_user';
             H_transmit = H_user'*H_user;
@@ -124,20 +138,16 @@ if (strcmp(pkt_type, 'Data') == 1)
             t2 = t2 + H_transmit; %transmit
             t3 = t3 + trace(H_receive); %receive
             t4 = t4 + trace(H_transmit); %transmit
-            t5 = t5 + trace(H_transmit); %SNR
+            t5{ind_sym}{index_f} = trace(H_transmit); %Signal
         end
-    end
-else
-    for ind_sym=1:1:Nsym
+    else
         % generating the channel coefficients in time and frequency domain
         h_time=fc_generate_h(Nsubcarrier,N_tx,N_rx,channel_model,AoD_in_floor,...
             Samping_rate_expansion_factor,PL_dB_in_count,ant_gain,Ncluster,angular);
-        
-        h_temp=zeros(size(h_time));
+        h_temp=size(h_time);
         for ind=1:1:N_tx*N_rx
             h_temp(ind,:)=fft(h_time(ind,:),Nsubcarrier)/sqrt(Nsubcarrier);
         end
-        
         H_freq=zeros(N_rx,N_tx,Nsubcarrier);
         for index_f=1:1:Nsubcarrier
             H_freq(:,:,index_f)=reshape(h_temp(:,index_f),N_rx,N_tx);
@@ -145,45 +155,53 @@ else
             t2 = t2 + H_freq(:,:,index_f)'*H_freq(:,:,index_f); %transmit
             t3 = t3 + trace(H_freq(:,:,index_f)*H_freq(:,:,index_f)'); %receive
             t4 = t4 + trace(H_freq(:,:,index_f)'*H_freq(:,:,index_f)); %transmit
-            t5 = t5 + trace(H_freq(:,:,index_f)'*H_freq(:,:,index_f)); %SNR
+            t5{ind_sym}{index_f} = trace(H_freq(:,:,index_f)'*H_freq(:,:,index_f)); %Signal
         end
     end
-end
-
-pr = 0;
-I = find(STA(:, 5)>0);
-for i=1:length(I)
-    tx1 = I(i);
-    if ~isempty(STA_Info(tx).CoMP_coordinator)
-        if (ismember(tx1, STA_Info(tx).CoMP_coordinator))
-            if(ismember(tx1, STA_Info(rv).cover_STA))
-                continue;
+    
+    for j=1:length(tx_interval)
+        if(time > tx_interval(j).start && time <= tx_interval(j).end)
+            tx1 = j;
+            if ~isempty(STA_Info(tx).CoMP_coordinator)
+                if (ismember(tx1, STA_Info(tx).CoMP_coordinator))
+                    if(ismember(tx1, STA_Info(rv).cover_STA))
+                        continue;
+                    end
+                end
+            end
+            if tx1 == rv, continue; end
+            if any(tx1 == tx), continue; end
+            if (STA(tx1, 8) == 2) % tx1 transmits Data pkt
+                if (STA(tx1, 3) == 0) % tx1 is an AP
+                    temp_N_tx = length(STA_Info(tx1).Precoder_record{1}(:,1,1));
+                    pr(Nsym,:) = pr(Nsym,:) + fc_cal_interference(ind_sym,tx1,rv,temp_N_tx,N_rx,Nsym,freq,...
+                        Nsubcarrier,STA(tx1,5),channel_model,Bandwidth,Thermal_noise,...
+                        tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
+                else % tx1 is a non-AP STA
+                    pr(Nsym,:) = pr(Nsym,:) + fc_cal_interference(ind_sym,tx1,rv,1,N_rx,Nsym,freq,...
+                        Nsubcarrier,STA(tx1,5),channel_model,Bandwidth,Thermal_noise,...
+                        tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
+                end
+            elseif (control_intf_skip_Debug == 0) % tx transmits RTS/CTS/ACK pkt, do not care # of antennas
+                pr(Nsym,:) = pr(Nsym,:) + fc_cal_interference(ind_sym,tx1,rv,1,N_rx,Nsym,freq,...
+                    Nsubcarrier,STA(tx1,5),channel_model,Bandwidth,Thermal_noise,...
+                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
             end
         end
     end
-    if tx1 == rv, continue; end
-    if any(tx1 == tx), continue; end
-    if (STA(tx1, 8) == 2) % tx1 transmits Data pkt
-        if (STA(tx1, 3) == 0) % tx1 is an AP
-            temp_N_tx = length(STA_Info(tx1).Precoder_record{1}(:,1,1));
-            pr = pr + fc_cal_interference(tx1,rv,temp_N_tx,N_rx,Nsym,freq,...
-                Nsubcarrier,STA(tx1,5),channel_model,Bandwidth,Thermal_noise,...
-                tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
-        else % tx1 is a non-AP STA
-            %Donot have uplink
-        end
-    elseif (control_intf_skip_Debug == 0) % tx transmits RTS/CTS/ACK pkt, do not care # of antennas
-        pr = pr + fc_cal_interference(tx1,rv,1,N_rx,Nsym,freq,...
-            Nsubcarrier,STA(tx1,5),channel_model,Bandwidth,Thermal_noise,...
-            tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
+    for index_f=1:1:Nsubcarrier
+        SINR(ind_sym,index_f) = (1/(N_tx*N_rx))*Pt*t5{ind_sym}{index_f}/(Thermal_noise+pr(Nsym,index_f));
     end
+    time = time - multi_symbol*SymbolTime(GI);
 end
-t5 = t5/Nsym;
-%SNR=(1/Nsubcarrier)*Pt*abs(t5)/(Nt*Nr*Thermal_noise);  %abs is needed?
-%t5 = (1/Nsubcarrier)*Pt*t5*(1/(N_tx*N_rx))/(Thermal_noise+pr);
-t5 = (1/(Nsubcarrier*N_rx))*Pt*t5*(1/(N_tx))/(Thermal_noise+pr);
-snr_dB=10*log10(t5);
-gamma = t5;
+SINR_per_f = zeros(1,ind_sym);
+for ind_sym=1:1:Nsym
+    SINR_per_f(ind_sym) = sum(SINR(ind_sym,:))/Nsubcarrier;
+end
+final_SINR = sum(SINR_per_f(:))/Nsym;
+
+snr_dB=10*log10(final_SINR);
+gamma = final_SINR;
 R_corr = abs(t1)/(abs((t3))/N_rx); % receive spatial correlation matrix
 S_corr = abs(t2)/(abs((t4))/(N_rx)); % transmit spatial correlation matrix
 eig_Value = eig(R_corr).';
