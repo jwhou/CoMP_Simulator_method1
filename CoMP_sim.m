@@ -24,7 +24,7 @@ global RTS_method;
 global lastsounding_enable;
 
 % scheme_quantity = [1,2,3];
-scheme_quantity = [2]; % testing by shuyu 
+scheme_quantity = [1,2]; % testing by shuyu 
 RTS_method = 0; %testing by jing-wen  0: no RTS, 1: Typical RTS, 2: RTS Simultaneously
 lastsounding_enable = 0; %testing by jing-wen  0: no record, 1: record
 run_quantity = [1];
@@ -36,7 +36,7 @@ Area = [500, 500]; % areaX, areaY
 average_Troughput = zeros(length(run_quantity), length(scheme_quantity));
 % ======================== Block 1 ========================
 % Block1: user inputs settings for simulation
-maxSimTime = 0.3;%1000*9*1e-6;
+maxSimTime = 1;%1000*9*1e-6;
 traffic_type = 0;
 traffic_rate = 0;
 % Initialize random number generator

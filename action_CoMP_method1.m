@@ -13,7 +13,7 @@
 
 function [NewEvents] = action_CoMP_method1(event,PHY_CH_module,Nsubcarrier,channel_model,Bandwidth,Thermal_noise,tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,AI,select_user)
 % parameter.m
-global event_Debug detail_Debug MIMO_Debug queue_Debug powercontrol_Debug control_frame_Debug sounding_skipevent_Debug;
+global event_Debug detail_Debug MIMO_Debug queue_Debug powercontrol_Debug control_frame_Debug sounding_skipevent_Debug control_intf_skip_Debug;
 global Num_Tx Num_Rx;
 global MCSAlgo per_order MCS MCS_ctrl;
 global BW GI R_data freq;
@@ -40,6 +40,7 @@ global num_msdu;
 global spatial_stream;
 global tx_interval; % added by jing-wen
 global interference_queue; % added by jing-wen
+global intq_expired_time; %add by jing-wen
 
 NewEvents = [];
 
@@ -847,21 +848,23 @@ switch event.type
             STA(i, 5) = event.pkt.power; % STA(i, 5) is the power STA i uses
             tx_interval(i).start = t;
             tx_interval(i).end = t + txtime;
-%             I = find(STA(:, 5)>0);
-%             for k=1:length(I)
-%                 tx1 = I(i);
-%                 if any(tx1 == j), continue; end
-%                 if any(tx1 == i), continue; end
-%                 interference_queue(i).list = [interference_queue(i).list tx1];
-%                 interference_queue(i).start = [interference_queue(i).start tx_interval(tx1).start];
-%                 interference_queue(i).end = [interference_queue(i).end tx_interval(tx1).end];
-%                 interference_queue(i).pkt_type = [interference_queue(i).pkt_type STA(tx1, 8)];
-%                 
-%                 interference_queue(tx1).list = [interference_queue(tx1).list i];
-%                 interference_queue(tx1).start = [interference_queue(tx1).start tx_interval(i).start];
-%                 interference_queue(tx1).end = [interference_queue(tx1).end tx_interval(i).end];
-%                 interference_queue(tx1).pkt_type = [interference_queue(tx1).pkt_type STA(i, 8)];
-%             end
+            I = find(STA(:, 5)>0);
+            for k=1:length(I)
+                tx1 = I(k);
+                if any(tx1 == j), continue; end
+                if any(tx1 == i), continue; end
+                if(strcmp(event.pkt.type, 'Data') == 1)
+                    interference_queue(i).list = [interference_queue(i).list tx1];
+                    interference_queue(i).start = [interference_queue(i).start tx_interval(tx1).start];
+                    interference_queue(i).end = [interference_queue(i).end tx_interval(tx1).end];
+                    interference_queue(i).pkt_type = [interference_queue(i).pkt_type 2];
+                elseif (control_intf_skip_Debug == 0)  %controllpkt
+                    interference_queue(tx1).list = [interference_queue(tx1).list i];
+                    interference_queue(tx1).start = [interference_queue(tx1).start tx_interval(i).start];
+                    interference_queue(tx1).end = [interference_queue(tx1).end tx_interval(i).end];
+                    interference_queue(tx1).pkt_type = [interference_queue(tx1).pkt_type 1];
+                end
+            end
             %disp([' STA power  ' num2str(STA(i,5))]);
             if (strcmp(event.pkt.type, 'Data') == 1)
                 % STA(i, 8) is to store the transmitting pkt category of STA i
@@ -1886,6 +1889,20 @@ switch event.type
             error(['recv_PHY: STA ' num2str(j) ' is not in receiving mode']);
         end
         STA(j, 6) = 0; % The receiver switches back to idle mode
+        
+        expired_index = 0;
+        for k=1:length(interference_queue(i).list)
+            last_txtime = interference_queue(i).end(k);
+            if (t - last_txtime < intq_expired_time)
+                expired_index = k-1;
+                break;
+            end
+        end
+        interference_queue(i).list(1:expired_index) = []; 
+        interference_queue(i).start(1:expired_index) = []; 
+        interference_queue(i).end(1:expired_index) = []; 
+        interference_queue(i).pkt_type(1:expired_index) = [];
+        
         if ((t > nav(j).start) && (t < nav(j).end))
             % This has already been checked when sending but nav may be changed during transmission, so double check
             if detail_Debug, disp(['  -D: STA '  num2str(j) ' has packet virtual collision.']); end

@@ -30,16 +30,18 @@ global STA STA_Info;
 global per_order;
 global GI SymbolTime;
 global control_intf_skip_Debug;
-global tx_interval;
+global tx_interval interference_queue;
+global num_msdu;
 
 tx_x_pos=STA(tx, 1);
 tx_y_pos=STA(tx, 2);
 rx_x_pos=[STA(rv, 1)'];
 rx_y_pos=[STA(rv, 2)'];
 N_tx = N_rx*length(rv);
+Nsym = num_symbol(pkt_type,L);
+L = L*num_msdu;
 signal_power=0;
 WiFi_standard='80211ac';
-Nsym = num_symbol(pkt_type,L);
 time = tx_interval(tx).end;
 tempindex_1=11;
 tempindex_2=11;
@@ -176,7 +178,7 @@ for ind_sym=1:1:Nsym
             M(:,own_stream,index_f) = null(H_freq(nown_stream,:,index_f));
         end
         STA_Info(tx).Channel_record{ind_sym}{index_f} = H_freq(:,:,index_f);
-        H_new(:,:,index_f)=H_freq(:,:,index_f);%*M(:,:,index_f);
+        H_new(:,:,index_f)=H_freq(:,:,index_f)*M(:,:,index_f);
         STA_Info(tx).Precoder_record{ind_sym}{index_f} = M(:,:,index_f);
         
         for j=1:length(rv)
@@ -191,9 +193,9 @@ for ind_sym=1:1:Nsym
         end
     end
     for k=1:length(rv)
-        for j=1:length(tx_interval)
-            if(time > tx_interval(j).start && time <= tx_interval(j).end)
-                tx1 = j;
+        for j=1:length(interference_queue(tx).list)
+            tx1 = interference_queue(tx).list(j);
+            if(time > interference_queue(tx).start(j) && time <= interference_queue(tx).end(j))
                 if ~isempty(STA_Info(tx).CoMP_coordinator)
                     if (ismember(tx1, STA_Info(tx).CoMP_coordinator))
                         if(ismember(tx1, STA_Info(rv(k)).cover_STA))
@@ -203,7 +205,7 @@ for ind_sym=1:1:Nsym
                 end
                 if tx1 == rv, continue; end
                 if any(tx1 == tx), continue; end
-                if (STA(tx1, 8) == 2) % tx1 transmits Data pkt
+                if (interference_queue(tx).pkt_type(j) == 2) % tx1 transmits Data pkt
                     if (STA(tx1, 3) == 0) % tx1 is an AP
                         temp_N_tx = length(STA_Info(tx1).Precoder_record{1}(:,1,1));
                         pr{k}(ind_sym,:) = pr{k}(ind_sym,:) + fc_cal_interference(ind_sym,tx1,rv(k),temp_N_tx,N_rx,Nsym,freq,...

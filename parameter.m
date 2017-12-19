@@ -44,6 +44,7 @@ global Max_Report_P; %add by jing-wen
 global PHY_CH_module;
 global num_msdu;
 global spatial_stream;
+global intq_expired_time; %add by jing-wen
 global ComputerCore;
 % ========== New for CoMP parameter ==========
 % ComputerCore = 3;   %The core number for parallel computing
@@ -329,6 +330,7 @@ traffic_queue = []; for i=1:Num_AP, traffic_queue(i).list = []; traffic_queue(i)
 interference_queue = []; for i=1:numSTAs, interference_queue(i).list = []; interference_queue(i).start = []; interference_queue(i).end = []; interference_queue(i).pkt_type = [];end 
 mac_status = []; for i=1:numSTAs, mac_status(i) = 0; end % Distinguish whether a traffic going medium access control or not
 queue_size = []; for i=1:numSTAs, queue_size(i) = 0; end % Size of each STA traffic queue
+intq_expired_time = 0.02; %s
 soundingperiod = 50*1e-3; % 50 ms
 % Variables for gathering statics
 statics_rv_bits = zeros(numSTAs,1); % total correct rv bits
