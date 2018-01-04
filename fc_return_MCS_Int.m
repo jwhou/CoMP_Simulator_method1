@@ -32,6 +32,7 @@ global GI SymbolTime;
 global control_intf_skip_Debug;
 global tx_interval interference_queue;
 global num_msdu;
+global cover_range;
 
 tx_x_pos=STA(tx, 1);
 tx_y_pos=STA(tx, 2);
@@ -40,6 +41,7 @@ rx_y_pos=[STA(rv, 2)'];
 N_tx = N_rx*length(rv);
 Nsym = num_symbol(pkt_type,L);
 L = L*num_msdu;
+multi_symbol = ceil(num_symbol(pkt_type,L)/num_symbol(pkt_type,size_MAC_body));
 signal_power=0;
 WiFi_standard='80211ac';
 time = tx_interval(tx).end;
@@ -171,12 +173,21 @@ for ind_sym=1:1:Nsym
     
     for index_f=1:1:Nsubcarrier
         H_freq(:,:,index_f)=reshape(h_temp(:,index_f),N_rx*length(rv),N_tx);
+%         if(length(rv)==1)
         for j=1:length(rv)
             all_stream = 1:1:N_tx;
             own_stream = (j-1)*N_rx+1:1:(j-1)*N_rx+N_rx;
             nown_stream = all_stream(~ismember(all_stream, own_stream));
             M(:,own_stream,index_f) = null(H_freq(nown_stream,:,index_f));
         end
+%         else
+%         for j=1:length(rv)*N_rx
+%             all_stream = 1:1:length(rv)*N_rx;
+%             own_stream = (j-1)*1+1:1:(j-1)*1+1;
+%             nown_stream = all_stream(~ismember(all_stream, own_stream));
+%             M(:,own_stream,index_f) = null(H_freq(nown_stream,:,index_f));
+%         end
+%         end
         STA_Info(tx).Channel_record{ind_sym}{index_f} = H_freq(:,:,index_f);
         H_new(:,:,index_f)=H_freq(:,:,index_f)*M(:,:,index_f);
         STA_Info(tx).Precoder_record{ind_sym}{index_f} = M(:,:,index_f);
@@ -195,6 +206,7 @@ for ind_sym=1:1:Nsym
     for k=1:length(rv)
         for j=1:length(interference_queue(tx).list)
             tx1 = interference_queue(tx).list(j);
+            if ((sqrt((STA(tx1, 1)-STA(rv(k), 1))^2+(STA(tx1, 2)-STA(rv(k), 2))^2)) > 1.5*cover_range),continue; end
             if(time > interference_queue(tx).start(j) && time <= interference_queue(tx).end(j))
                 if ~isempty(STA_Info(tx).CoMP_coordinator)
                     if (ismember(tx1, STA_Info(tx).CoMP_coordinator))
@@ -205,20 +217,21 @@ for ind_sym=1:1:Nsym
                 end
                 if tx1 == rv, continue; end
                 if any(tx1 == tx), continue; end
+                tx1power = interference_queue(tx).power(j);
                 if (interference_queue(tx).pkt_type(j) == 2) % tx1 transmits Data pkt
                     if (STA(tx1, 3) == 0) % tx1 is an AP
                         temp_N_tx = length(STA_Info(tx1).Precoder_record{1}(:,1,1));
                         pr{k}(ind_sym,:) = pr{k}(ind_sym,:) + fc_cal_interference(ind_sym,tx1,rv(k),temp_N_tx,N_rx,Nsym,freq,...
-                            Nsubcarrier,STA(tx1,5),channel_model,Bandwidth,Thermal_noise,...
+                            Nsubcarrier,tx1power,channel_model,Bandwidth,Thermal_noise,...
                             tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
                     else % tx1 is a non-AP STA
                         pr{k}(ind_sym,:) = pr{k}(ind_sym,:) + fc_cal_interference(ind_sym,tx1,rv(k),1,N_rx,Nsym,freq,...
-                            Nsubcarrier,STA(tx1,5),channel_model,Bandwidth,Thermal_noise,...
+                            Nsubcarrier,tx1power,channel_model,Bandwidth,Thermal_noise,...
                             tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
                     end
                 elseif (control_intf_skip_Debug == 0) % tx transmits RTS/CTS/ACK pkt, do not care # of antennas
                     pr{k}(ind_sym,:) = pr{k}(ind_sym,:) + fc_cal_interference(ind_sym,tx1,rv(k),1,N_rx,Nsym,freq,...
-                        Nsubcarrier,STA(tx1,5),channel_model,Bandwidth,Thermal_noise,...
+                        Nsubcarrier,tx1power,channel_model,Bandwidth,Thermal_noise,...
                         tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
                 end
             end
@@ -226,10 +239,16 @@ for ind_sym=1:1:Nsym
     end
     for k=1:length(rv)
         for index_f=1:1:Nsubcarrier
-            SINR(k,ind_sym,index_f) = (1/(N_tx*N_rx))*Pt*T5{k}{ind_sym}{index_f}/(Thermal_noise+pr{k}(ind_sym,index_f));
+%             if length(rv)==1
+                SINR(k,ind_sym,index_f) = (1/(N_tx*N_rx))*Pt*T5{k}{ind_sym}{index_f}/(Thermal_noise+pr{k}(ind_sym,index_f));
+%             else
+%                 Prmu = H_new(:,:,index_f);
+%                 
+%                 SINR(k,ind_sym,index_f) = (1/(N_tx*N_rx))*Pt*T5{k}{ind_sym}{index_f}/(Thermal_noise+pr{k}(ind_sym,index_f)+trace(Prmu((k-1)*2+1:(k*2), (2-k)*2+1:(2-k)*2+2)*Prmu((k-1)*2+1:(k*2), (2-k)*2+1:(2-k)*2+2)'*Pt*(1/(N_tx*N_rx))));
+%             end 
         end
     end
-    time = time - SymbolTime(GI);
+    time = time - multi_symbol * SymbolTime(GI);
 end
 SINR_per_f = zeros(length(rv),ind_sym);
 final_SINR = zeros(1,length(rv));

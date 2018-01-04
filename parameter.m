@@ -106,7 +106,7 @@ cover_range = 50; % unit meter
 
 % =========== PHY parameters ===========
 % Antenna size
-Num_Tx = 4;
+Num_Tx = 8;
 Num_Rx = 2;
 
 if select_algo == 1
@@ -118,9 +118,9 @@ end
 % Dynmic MCS, please see estimate_SNR.m, PER_approximation.m and Init_CoMPpkt.m for details
 % which involves A-MSDU or A-MPDU (global variable: Mode_AMPDU_AMSDU)
 MCS_ctrl = 1; % MCS for contorl frames
-MCSAlgo = 1; % Dynamic MCS = 1, Static MCS = 0
+MCSAlgo = 0; % Dynamic MCS = 1, Static MCS = 0
 per_order = 1e-2; % input argument for PER_approximation.m
-MCS = 3; % Static MCS: 64-QAM 5/6
+MCS = 2; % Static MCS: 64-QAM 5/6
 
 % 802.11ac P.297 PHYdata for VHT MCSs
 % R_data(MCS0-9, BandWidth 20/40/80/160 MHz, Guard Interval, Number of spatial stream);
@@ -327,7 +327,7 @@ packet_id = zeros(numSTAs, 1); % id for next MAC or NET packet
 pending_id = zeros(numSTAs, 1); % id of current transmitting MAC packet, used for timeout
 % ========= Other parameters ==========
 traffic_queue = []; for i=1:Num_AP, traffic_queue(i).list = []; traffic_queue(i).size = [];end % Traffic queue for AP because non-AP STA only transmits to the associated AP
-interference_queue = []; for i=1:numSTAs, interference_queue(i).list = []; interference_queue(i).start = []; interference_queue(i).end = []; interference_queue(i).pkt_type = [];end 
+interference_queue = []; for i=1:numSTAs, interference_queue(i).list = []; interference_queue(i).start = []; interference_queue(i).end = []; interference_queue(i).pkt_type = []; interference_queue(i).power = [];end 
 mac_status = []; for i=1:numSTAs, mac_status(i) = 0; end % Distinguish whether a traffic going medium access control or not
 queue_size = []; for i=1:numSTAs, queue_size(i) = 0; end % Size of each STA traffic queue
 intq_expired_time = 0.02; %s

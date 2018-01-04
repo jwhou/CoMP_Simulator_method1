@@ -13,6 +13,7 @@ global control_intf_skip_Debug
 global tx_interval interference_queue;
 global size_MAC_body;
 global num_msdu;
+global cover_range;
 
 tx_x_pos=STA(tx, 1);
 tx_y_pos=STA(tx, 2);
@@ -162,6 +163,7 @@ for ind_sym=1:1:Nsym
     
     for j=1:length(interference_queue(tx).list)
         tx1 = interference_queue(tx).list(j);
+        if ((sqrt((STA(tx1, 1)-STA(rv, 1))^2+(STA(tx1, 2)-STA(rv, 2))^2)) > 1.5*cover_range),continue; end
         if(time > interference_queue(tx).start(j) && time <= interference_queue(tx).end(j))
             if ~isempty(STA_Info(tx).CoMP_coordinator)
                 if (ismember(tx1, STA_Info(tx).CoMP_coordinator))
@@ -172,26 +174,27 @@ for ind_sym=1:1:Nsym
             end
             if tx1 == rv, continue; end
             if any(tx1 == tx), continue; end
+            tx1power = interference_queue(tx).power(j);
             if (interference_queue(tx).pkt_type(j) == 2) % tx1 transmits Data pkt
                 if (STA(tx1, 3) == 0) % tx1 is an AP
                     temp_N_tx = length(STA_Info(tx1).Precoder_record{1}(:,1,1));
-                    pr(Nsym,:) = pr(Nsym,:) + fc_cal_interference(ind_sym,tx1,rv,temp_N_tx,N_rx,Nsym,freq,...
-                        Nsubcarrier,STA(tx1,5),channel_model,Bandwidth,Thermal_noise,...
+                    pr(ind_sym,:) = pr(ind_sym,:) + fc_cal_interference(ind_sym,tx1,rv,temp_N_tx,N_rx,Nsym,freq,...
+                        Nsubcarrier,tx1power,channel_model,Bandwidth,Thermal_noise,...
                         tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
                 else % tx1 is a non-AP STA
-                    pr(Nsym,:) = pr(Nsym,:) + fc_cal_interference(ind_sym,tx1,rv,1,N_rx,Nsym,freq,...
-                        Nsubcarrier,STA(tx1,5),channel_model,Bandwidth,Thermal_noise,...
+                    pr(ind_sym,:) = pr(ind_sym,:) + fc_cal_interference(ind_sym,tx1,rv,1,N_rx,Nsym,freq,...
+                        Nsubcarrier,tx1power,channel_model,Bandwidth,Thermal_noise,...
                         tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
                 end
             elseif (control_intf_skip_Debug == 0) % tx transmits RTS/CTS/ACK pkt, do not care # of antennas
-                pr(Nsym,:) = pr(Nsym,:) + fc_cal_interference(ind_sym,tx1,rv,1,N_rx,Nsym,freq,...
-                    Nsubcarrier,STA(tx1,5),channel_model,Bandwidth,Thermal_noise,...
+                pr(ind_sym,:) = pr(ind_sym,:) + fc_cal_interference(ind_sym,tx1,rv,1,N_rx,Nsym,freq,...
+                    Nsubcarrier,tx1power,channel_model,Bandwidth,Thermal_noise,...
                     tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
             end
         end
     end
     for index_f=1:1:Nsubcarrier
-        SINR(ind_sym,index_f) = (1/(N_tx*N_rx))*Pt*t5{ind_sym}{index_f}/(Thermal_noise+pr(Nsym,index_f));
+        SINR(ind_sym,index_f) = (1/(N_tx*N_rx))*Pt*t5{ind_sym}{index_f}/(Thermal_noise+pr(ind_sym,index_f));
     end
     time = time - multi_symbol*SymbolTime(GI);
 end

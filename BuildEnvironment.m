@@ -35,12 +35,12 @@ if(AP_distribution == -2)
     Num_AP = 4;
     AP_location = [
         40,40; % AP1
-        100,40; % AP2
+         100,40; % AP2
         40,100; % AP3
         100,100; % AP4
         ];
     if (User_distribution == -2)
-        AP_STA_dis = 29;
+        AP_STA_dis = 30;
         User_location = [
             AP_location(1,1)+AP_STA_dis*cosd(105),AP_location(1,2)+AP_STA_dis*sind(105);
             AP_location(1,1)+AP_STA_dis*cosd(225),AP_location(1,2)+AP_STA_dis*sind(225);
@@ -226,8 +226,12 @@ rx_x_pos = User_location(:,1);
 rx_y_pos = User_location(:,2);
 
 XY_location = [AP_location; User_location];
- wall_start = [0 0;150 0; 150 150; 0 150];
- wall_end = [150 0; 150 150; 0 150; 0 0];
+%  wall_start = [0 0;140 0; 140 80; 0 80];
+%  wall_end = [140 0; 140 80; 0 80; 0 0];
+%  wall_start = [0 0;80 0; 80 80; 0 80];
+%  wall_end = [80 0; 80 80; 0 80; 0 0];
+  wall_start = [0 0;140 0; 140 140; 0 140];
+ wall_end = [140 0; 140 140; 0 140; 0 0];
 %wall_start=[0   0;ceil(max(XY_location(:, 1))/cover_range)*cover_range 0;ceil(max(XY_location(:, 1))/cover_range)*cover_range ceil(max(XY_location(:, 2))/cover_range)*cover_range;0 ceil(max(XY_location(:, 2))/cover_range)*cover_range];
 %wall_end  =[ceil(max(XY_location(:, 1))/cover_range)*cover_range  0;ceil(max(XY_location(:, 1))/cover_range)*cover_range ceil(max(XY_location(:, 2))/cover_range)*cover_range;0 ceil(max(XY_location(:, 2))/cover_range)*cover_range;0 0];
 end

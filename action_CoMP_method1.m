@@ -854,15 +854,35 @@ switch event.type
                 if any(tx1 == j), continue; end
                 if any(tx1 == i), continue; end
                 if(strcmp(event.pkt.type, 'Data') == 1)
-                    interference_queue(i).list = [interference_queue(i).list tx1];
-                    interference_queue(i).start = [interference_queue(i).start tx_interval(tx1).start];
-                    interference_queue(i).end = [interference_queue(i).end tx_interval(tx1).end];
-                    interference_queue(i).pkt_type = [interference_queue(i).pkt_type 2];
+                    if ~ismember(tx_interval(tx1).start, interference_queue(i).start(all_tx1))
+                        interference_queue(i).list = [interference_queue(i).list tx1];
+                        interference_queue(i).start = [interference_queue(i).start tx_interval(tx1).start];
+                        interference_queue(i).end = [interference_queue(i).end tx_interval(tx1).end];
+                        interference_queue(i).pkt_type = [interference_queue(i).pkt_type STA(tx1, 8)];
+                        interference_queue(i).power = [interference_queue(i).power STA(tx1, 5)];
+                    end
+                    if ~ismember(tx_interval(i).start, interference_queue(i).start(all_i))
+                        interference_queue(tx1).list = [interference_queue(tx1).list i];
+                        interference_queue(tx1).start = [interference_queue(tx1).start tx_interval(i).start];
+                        interference_queue(tx1).end = [interference_queue(tx1).end tx_interval(i).end];
+                        interference_queue(tx1).pkt_type = [interference_queue(tx1).pkt_type 2];
+                        interference_queue(tx1).power = [interference_queue(tx1).power STA(i, 5)];
+                    end
                 elseif (control_intf_skip_Debug == 0)  %controllpkt
-                    interference_queue(tx1).list = [interference_queue(tx1).list i];
-                    interference_queue(tx1).start = [interference_queue(tx1).start tx_interval(i).start];
-                    interference_queue(tx1).end = [interference_queue(tx1).end tx_interval(i).end];
-                    interference_queue(tx1).pkt_type = [interference_queue(tx1).pkt_type 1];
+                    if ~ismember(tx_interval(tx1).start, interference_queue(i).start(all_tx1))
+                        interference_queue(i).list = [interference_queue(i).list tx1];
+                        interference_queue(i).start = [interference_queue(i).start tx_interval(tx1).start];
+                        interference_queue(i).end = [interference_queue(i).end tx_interval(tx1).end];
+                        interference_queue(i).pkt_type = [interference_queue(i).pkt_type STA(tx1, 8)];
+                        interference_queue(i).power = [interference_queue(i).power STA(tx1, 5)];
+                    end
+                    if ~ismember(tx_interval(i).start, interference_queue(i).start(all_i))
+                        interference_queue(tx1).list = [interference_queue(tx1).list i];
+                        interference_queue(tx1).start = [interference_queue(tx1).start tx_interval(i).start];
+                        interference_queue(tx1).end = [interference_queue(tx1).end tx_interval(i).end];
+                        interference_queue(tx1).pkt_type = [interference_queue(tx1).pkt_type 1];
+                        interference_queue(tx1).power = [interference_queue(tx1).power STA(i, 5)];
+                    end
                 end
             end
             %disp([' STA power  ' num2str(STA(i,5))]);
@@ -1214,82 +1234,84 @@ switch event.type
                 end
             end
             Intend(Intend == 0) = []; if detail_Debug, disp(['  -D: Intended receiver: STA [' num2str(Intend) ']']); end
-            % II.2: Setup receivers of not matching RA
-            NotIntend = zeros(1, Num_AP+Num_User);
-            %disp([' STA power ' num2str(STA(i,5)) 'event.pkt.MU ' num2str(event.pkt.MU) 'event.pkt.CoMP' num2str(event.pkt.CoMP) ' pkt type ' num2str(event.pkt.type)]);
-            for k=1:length(STA_Info(i).cover_STA)
-                sel_STA = STA_Info(i).cover_STA(k);
-                if ((sqrt((STA(i, 1)-STA(sel_STA, 1))^2+(STA(i, 2)-STA(sel_STA, 2))^2)) > event.pkt.cover_range),continue; end
-                % Due to broadcast nature in wireless channel, every idle STA in this STA coverage may capture/sense this transmission
-                if (event.pkt.MU == 0 && event.pkt.CoMP == 0)
-                    % E.g., send_PHY: pkt(i -> j)
-                    % RTS(AP -> STA1)/CTS(STA1 -> AP)/Data(AP -> STA1)/ACK(STA1 -> AP)
-                    if (STA(sel_STA, 6) ~= 0 || sel_STA == i || sel_STA == j), continue; end
-                    if overlap(t, t+txtime, nav(sel_STA).start, nav(sel_STA).end), continue; end
-                    NotIntend(sel_STA) = sel_STA;
-                    STA(sel_STA, 6) = 2; % The receiver switches to receiving mode
-                    TempEvent = event;
-                    TempEvent.timer = t + txtime;
-                    TempEvent.type = 'recv_PHY';
-                    TempEvent.STA_ID = sel_STA;
-%                     disp([' not intend timer ' num2str(TempEvent.timer)]);
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                elseif (event.pkt.MU == 1 && event.pkt.CoMP == 0) % If a DL MU-MIMO transmission is on
-                    % E.g., send_PHY: pkt(i -> j)
-                    % RTS(AP -> STA1, STA2)/CTS(STA1 -> AP)/CTS(STA2 -> AP)/Data(AP -> STA1, STA2)/ACK(STA1 -> AP)/ACK(STA2 -> AP)
-                    % RTS(AP -> STA1, STA2)/                CTS(STA2 -> AP)/Data(AP -> STA2)                      /ACK(STA2 -> AP)
-                    % RTS(AP -> STA1, STA2)/CTS(STA1 -> AP)                /Data(AP -> STA1)      /ACK(STA1 -> AP)
-                    if (any(sel_STA == event.pkt.Group))
-                        %if (STA(sel_STA, 7) == 1)
-                            % MU receive RTS from AP correctly would ignore inter-user's CTS or ACK
-                            continue;
-                        %end
-                    end
-                    if (STA(sel_STA, 6) ~= 0 || sel_STA == i || any(sel_STA == j)), continue; end
-                    if overlap(t, t+txtime, nav(sel_STA).start, nav(sel_STA).end), continue; end
-                    NotIntend(sel_STA) = sel_STA;
-                    STA(sel_STA, 6) = 2; % The receiver switches to receiving mode
-                    TempEvent = event;
-                    TempEvent.timer = t + txtime;
-                    TempEvent.type = 'recv_PHY';
-                    TempEvent.STA_ID = sel_STA;
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                elseif (event.pkt.MU == 1 && event.pkt.CoMP == 1) % If a CoMP transmission is on
-                    % E.g., send_PHY: pkt(i -> j)
-                    % RTS(AP1 -> STA2, STA6)/RTS(AP5 -> STA2, STA6)/CTS(STA2 -> AP1, AP5)/CTS(STA6 -> AP1, AP5)/ Data(AP1 -> STA2, STA6) and Data(AP5 -> STA2, STA6)/ ACK(STA2 -> AP1)/ACK(STA6 -> AP5)
-                    if (any(sel_STA == event.pkt.CoMPGroup))
-                        %if (STA(sel_STA, 7) == 1)
-                            % MU receive RTS from AP correctly would ignore inter-user's CTS or ACK
-                            continue;
-                        %end
-                    end
-                    if (strcmp(event.pkt.type, 'CTS') == 1)
-                        if (ismember(STA(sel_STA, 3),STA_Info(STA(i, 3)).CoMP_coordinator))
-                            continue
+            if strcmp(event.pkt.type, 'Data') ~= 1
+                % II.2: Setup receivers of not matching RA
+                NotIntend = zeros(1, Num_AP+Num_User);
+                %disp([' STA power ' num2str(STA(i,5)) 'event.pkt.MU ' num2str(event.pkt.MU) 'event.pkt.CoMP' num2str(event.pkt.CoMP) ' pkt type ' num2str(event.pkt.type)]);
+                for k=1:length(STA_Info(i).cover_STA)
+                    sel_STA = STA_Info(i).cover_STA(k);
+                    if ((sqrt((STA(i, 1)-STA(sel_STA, 1))^2+(STA(i, 2)-STA(sel_STA, 2))^2)) > event.pkt.cover_range),continue; end
+                    % Due to broadcast nature in wireless channel, every idle STA in this STA coverage may capture/sense this transmission
+                    if (event.pkt.MU == 0 && event.pkt.CoMP == 0)
+                        % E.g., send_PHY: pkt(i -> j)
+                        % RTS(AP -> STA1)/CTS(STA1 -> AP)/Data(AP -> STA1)/ACK(STA1 -> AP)
+                        if (STA(sel_STA, 6) ~= 0 || sel_STA == i || sel_STA == j), continue; end
+                        if overlap(t, t+txtime, nav(sel_STA).start, nav(sel_STA).end), continue; end
+                        NotIntend(sel_STA) = sel_STA;
+                        STA(sel_STA, 6) = 2; % The receiver switches to receiving mode
+                        TempEvent = event;
+                        TempEvent.timer = t + txtime;
+                        TempEvent.type = 'recv_PHY';
+                        TempEvent.STA_ID = sel_STA;
+    %                     disp([' not intend timer ' num2str(TempEvent.timer)]);
+                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                    elseif (event.pkt.MU == 1 && event.pkt.CoMP == 0) % If a DL MU-MIMO transmission is on
+                        % E.g., send_PHY: pkt(i -> j)
+                        % RTS(AP -> STA1, STA2)/CTS(STA1 -> AP)/CTS(STA2 -> AP)/Data(AP -> STA1, STA2)/ACK(STA1 -> AP)/ACK(STA2 -> AP)
+                        % RTS(AP -> STA1, STA2)/                CTS(STA2 -> AP)/Data(AP -> STA2)                      /ACK(STA2 -> AP)
+                        % RTS(AP -> STA1, STA2)/CTS(STA1 -> AP)                /Data(AP -> STA1)      /ACK(STA1 -> AP)
+                        if (any(sel_STA == event.pkt.Group))
+                            %if (STA(sel_STA, 7) == 1)
+                                % MU receive RTS from AP correctly would ignore inter-user's CTS or ACK
+                                continue;
+                            %end
                         end
-                    end
-                    if (strcmp(event.pkt.type, 'Data') == 1 || strcmp(event.pkt.type, 'RTS') == 1 || strcmp(event.pkt.type, 'CTS') == 1)
-                        if (STA(i, 3) == 0)
-                            if (any(sel_STA == STA_Info(i).CoMP_coordinator)), continue; end
-                        elseif (STA(j, 3) == 0)
-                            if (any(sel_STA == [STA_Info(j).CoMP_coordinator])), continue; end
+                        if (STA(sel_STA, 6) ~= 0 || sel_STA == i || any(sel_STA == j)), continue; end
+                        if overlap(t, t+txtime, nav(sel_STA).start, nav(sel_STA).end), continue; end
+                        NotIntend(sel_STA) = sel_STA;
+                        STA(sel_STA, 6) = 2; % The receiver switches to receiving mode
+                        TempEvent = event;
+                        TempEvent.timer = t + txtime;
+                        TempEvent.type = 'recv_PHY';
+                        TempEvent.STA_ID = sel_STA;
+                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                    elseif (event.pkt.MU == 1 && event.pkt.CoMP == 1) % If a CoMP transmission is on
+                        % E.g., send_PHY: pkt(i -> j)
+                        % RTS(AP1 -> STA2, STA6)/RTS(AP5 -> STA2, STA6)/CTS(STA2 -> AP1, AP5)/CTS(STA6 -> AP1, AP5)/ Data(AP1 -> STA2, STA6) and Data(AP5 -> STA2, STA6)/ ACK(STA2 -> AP1)/ACK(STA6 -> AP5)
+                        if (any(sel_STA == event.pkt.CoMPGroup))
+                            %if (STA(sel_STA, 7) == 1)
+                                % MU receive RTS from AP correctly would ignore inter-user's CTS or ACK
+                                continue;
+                            %end
                         end
+                        if (strcmp(event.pkt.type, 'CTS') == 1)
+                            if (ismember(STA(sel_STA, 3),STA_Info(STA(i, 3)).CoMP_coordinator))
+                                continue
+                            end
+                        end
+                        if (strcmp(event.pkt.type, 'Data') == 1 || strcmp(event.pkt.type, 'RTS') == 1 || strcmp(event.pkt.type, 'CTS') == 1)
+                            if (STA(i, 3) == 0)
+                                if (any(sel_STA == STA_Info(i).CoMP_coordinator)), continue; end
+                            elseif (STA(j, 3) == 0)
+                                if (any(sel_STA == [STA_Info(j).CoMP_coordinator])), continue; end
+                            end
+                        end
+                        if (STA(sel_STA, 6) ~= 0 || sel_STA == i || any(sel_STA == j)), continue; end
+                        if overlap(t, t+txtime, nav(sel_STA).start, nav(sel_STA).end), continue; end
+                        NotIntend(sel_STA) = sel_STA;
+                        STA(sel_STA, 6) = 2; % The receiver switches to receiving mode
+                        TempEvent = event;
+                        if (strcmp(event.pkt.type, 'Data') == 1)
+                                TempEvent.pkt.tx = [i, STA_Info(i).CoMP_coordinator];%CoMP_Controller.connector;
+                        end
+                        TempEvent.timer = t + txtime;
+                        TempEvent.type = 'recv_PHY';
+                        TempEvent.STA_ID = sel_STA;
+                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
                     end
-                    if (STA(sel_STA, 6) ~= 0 || sel_STA == i || any(sel_STA == j)), continue; end
-                    if overlap(t, t+txtime, nav(sel_STA).start, nav(sel_STA).end), continue; end
-                    NotIntend(sel_STA) = sel_STA;
-                    STA(sel_STA, 6) = 2; % The receiver switches to receiving mode
-                    TempEvent = event;
-                    if (strcmp(event.pkt.type, 'Data') == 1)
-                            TempEvent.pkt.tx = [i, STA_Info(i).CoMP_coordinator];%CoMP_Controller.connector;
-                    end
-                    TempEvent.timer = t + txtime;
-                    TempEvent.type = 'recv_PHY';
-                    TempEvent.STA_ID = sel_STA;
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
                 end
+                NotIntend(NotIntend == 0) = []; if detail_Debug, disp(['  -D: Not intended receiver: STA [' num2str(NotIntend) ']']); end
             end
-            NotIntend(NotIntend == 0) = []; if detail_Debug, disp(['  -D: Not intended receiver: STA [' num2str(NotIntend) ']']); end
             % Setting III:
             TempEvent = event;
             if (event.pkt.MU == 0 && event.pkt.CoMP == 0)
@@ -1403,11 +1425,11 @@ switch event.type
                 DataSent(i) = DataSent(i) + length(j);
                 STA_Info(i).Precoding_Matrix(STA_Info(i).Precoding_Matrix ~= 0) = 0;
             elseif (event.pkt.MU == 1 && event.pkt.CoMP == 1)
-                if (length(j) == length(event.pkt.CoMPGroup))
+%                 if (length(j) == length(event.pkt.CoMPGroup))
                     DataSent(i) = DataSent(i) + length(STA_Info(i).IntendSTA);
-                else
-                    DataSent(i) = DataSent(i) + length(j);
-                end
+%                 else
+%                     DataSent(i) = DataSent(i) + length(j);
+%                 end
                 STA_Info(i).Precoding_Matrix(STA_Info(i).Precoding_Matrix ~= 0) = 0;
             end
         elseif strcmp(event.pkt.type, 'NDP_Ann')
@@ -1718,6 +1740,7 @@ switch event.type
             CoMP_Controller.information(i).numInform = 1;
             % CoMP_Controller collect information of receiving CTS
             CoMP_Controller.information(i).rxSTA_index = ismember(STA_Info(i).IntendSTA, STA_Info(i).rxMU).*STA_Info(i).IntendSTA;
+            STA_Info(i).IntendSTA = CoMP_Controller.information(i).rxSTA_index;
             % remove pending id for RTS
             pending_id(i) = 0;
 
@@ -1891,17 +1914,19 @@ switch event.type
         STA(j, 6) = 0; % The receiver switches back to idle mode
         
         expired_index = 0;
-        for k=1:length(interference_queue(i).list)
-            last_txtime = interference_queue(i).end(k);
+        tx1 = j;
+        for k=1:length(interference_queue(tx1).list)
+            last_txtime = interference_queue(tx1).end(k);
             if (t - last_txtime < intq_expired_time)
                 expired_index = k-1;
                 break;
             end
         end
-        interference_queue(i).list(1:expired_index) = []; 
-        interference_queue(i).start(1:expired_index) = []; 
-        interference_queue(i).end(1:expired_index) = []; 
-        interference_queue(i).pkt_type(1:expired_index) = [];
+        interference_queue(tx1).list(1:expired_index) = []; 
+        interference_queue(tx1).start(1:expired_index) = []; 
+        interference_queue(tx1).end(1:expired_index) = []; 
+        interference_queue(tx1).pkt_type(1:expired_index) = [];
+        interference_queue(tx1).power(1:expired_index) = [];
         
         if ((t > nav(j).start) && (t < nav(j).end))
             % This has already been checked when sending but nav may be changed during transmission, so double check
@@ -1969,10 +1994,11 @@ switch event.type
                                 Prob = 1;
                                 pr = 1;
                             else
-                                [pr,snr, Prob] = fc_recv_phy(t,find(j==event.pkt.CoMPGroup),event.pkt.MCS_index(j==event.pkt.CoMPGroup),i(i==STA(j,3)),j,length(event.pkt.Group)*spatial_stream,spatial_stream,freq,...
+                                [pr,snr, Prob] = fc_recv_phy(t,find(j==event.pkt.CoMPGroup),event.pkt.MCS_index(j==event.pkt.CoMPGroup),i(i==STA(j,3)),j,length(event.pkt.CoMPGroup)*spatial_stream,spatial_stream,freq,...
                                                     Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
                                                     tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,event.pkt.size(j==event.pkt.CoMPGroup),AI,event.pkt.type);
-                                %    Prob = 0;
+%                                     Prob = 0;
+%                                     pr = 0;
                                 %dBB = db(snr, 'power');disp(['STA ' num2str(j) ' receives ' num2str(snr) '(' num2str(dBB) ') => PER = ' num2str(Prob) ' select MCS' num2str(event.pkt.MCS_index(j==event.pkt.Group)) '.']);
                             end
                         end
