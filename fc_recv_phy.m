@@ -1,7 +1,7 @@
 % Given the simulated room and the TX/RX position, this function returns
 % the received signal power and interference
 
-function [pr,snr_dB,final_PER] = fc_recv_phy(t,order,MCS,tx,rv,N_tx,N_rx,freq,...
+function [pr,snr_dB,final_PER] = fc_recv_phy(rate,t,order,MCS,tx,rv,N_tx,N_rx,freq,...
     Nsubcarrier,Pt,channel_model,Bandwidth,Thermal_noise,...
     tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range, pkt_size_in_bits,tempindex_AI, pkt_type)
 
@@ -23,8 +23,8 @@ WiFi_standard='80211ac';
 L = pkt_size_in_bits;
 time = tx_interval(tx).end;
 MCS_int=MCS-1; %decrease 1 for cope with simulator
-Nsym = num_symbol(pkt_type,size_MAC_body);  % number of OFDM symbols per packet
-multi_symbol = ceil(num_symbol(pkt_type,L)/num_symbol(pkt_type,size_MAC_body));
+Nsym = num_symbol(rate,'MAC_body',size_MAC_body);  % number of OFDM symbols per packet
+multi_symbol = num_symbol(rate,pkt_type,L)/num_symbol(rate,'MAC_body',size_MAC_body);
 tempindex_1=11;
 tempindex_2=11;
 tempindex_3=11;
@@ -128,6 +128,7 @@ end
 
 SINR = zeros(Nsym,Nsubcarrier);
 pr = zeros(Nsym,Nsubcarrier);
+times = 0;
 for ind_sym=1:1:Nsym
     if (strcmp(pkt_type, 'Data') == 1)
         H_new = zeros(N_tx,N_tx,Nsubcarrier);
@@ -181,6 +182,7 @@ for ind_sym=1:1:Nsym
                     pr(ind_sym,:) = pr(ind_sym,:) + fc_cal_interference(ind_sym,tx1,rv,temp_N_tx,N_rx,Nsym,freq,...
                         Nsubcarrier,tx1power,channel_model,Bandwidth,Thermal_noise,...
                         tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
+                    times = times +1;
                 else % tx1 is a non-AP STA
                     pr(ind_sym,:) = pr(ind_sym,:) + fc_cal_interference(ind_sym,tx1,rv,1,N_rx,Nsym,freq,...
                         Nsubcarrier,tx1power,channel_model,Bandwidth,Thermal_noise,...

@@ -22,7 +22,7 @@
 %   wall_mix,wall_index,HOV,room_range
 %   pkt_size_in_bits
 
-function [MCS_index,snr_dB] = fc_return_MCS_Int(t,target_PER,tx,rv,N_tx,N_rx,freq,...
+function [MCS_index,snr_dB] = fc_return_MCS_Int(rate,t,target_PER,tx,rv,N_tx,N_rx,freq,...
     Nsubcarrier,Pt,channel_model,Bandwidth,Thermal_noise,...
     tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range, L,tempindex_AI,pkt_type)
 
@@ -33,15 +33,16 @@ global control_intf_skip_Debug;
 global tx_interval interference_queue;
 global num_msdu;
 global cover_range;
+global size_MAC_body;
 
 tx_x_pos=STA(tx, 1);
 tx_y_pos=STA(tx, 2);
 rx_x_pos=[STA(rv, 1)'];
 rx_y_pos=[STA(rv, 2)'];
 N_tx = N_rx*length(rv);
-Nsym = num_symbol(pkt_type,L);
+Nsym = num_symbol(rate,'MAC_body',size_MAC_body);
 L = L*num_msdu;
-multi_symbol = ceil(num_symbol(pkt_type,L)/num_symbol(pkt_type,size_MAC_body));
+multi_symbol = num_symbol(rate,pkt_type,L)/num_symbol(rate,'MAC_body',size_MAC_body);
 signal_power=0;
 WiFi_standard='80211ac';
 time = tx_interval(tx).end;

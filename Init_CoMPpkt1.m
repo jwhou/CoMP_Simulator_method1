@@ -12,6 +12,7 @@ function [CoMP_pkt] = Init_CoMPpkt1(old_pkt, i, t)
 %           old_pkt: a STA state and packet detail
 %           i: CoMP AP index
 %           t: time for start initilizing CoMP packet
+global powercontrol_Debug;
 global Num_Tx Num_Rx;
 global MCSAlgo per_order MCS;
 global BW GI R_data;

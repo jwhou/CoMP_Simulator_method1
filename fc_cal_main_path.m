@@ -445,7 +445,7 @@ function [AoD,Ncluster,distance,index,wall_in_count,collision_in_count]=fc_cal_m
     % ========================= debug parameter ========================= %
     
     % === According the cluster type A to F, get number of the cluster == %
-    Ncluster = fc_give_num_of_cluster(2,count); 
+    Ncluster = fc_give_num_of_cluster(reflection_times,count); 
     %Ncluster = min(6,count);
     % =================================================================== %
     

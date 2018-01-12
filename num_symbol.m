@@ -4,7 +4,7 @@
 % Version   : 0.9
 % Date      : 2017/11/25
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-function Nsym = num_symbol(pkt_type,L)
+function Nsym = num_symbol(rate,pkt_type,L)
 
 global GI SymbolTime;
 global Mode_AMPDU_AMSDU;
@@ -34,7 +34,7 @@ switch pkt_type
         Nsym = ceil((L / basic_rate)/SymbolTime(GI));
 	case 'Data'
         %Nsym = 1000;
-        Nsym = ceil((L /basic_rate)/SymbolTime(GI));
+        Nsym = ceil((L /rate)/SymbolTime(GI));
 	otherwise
 		disp(['num_symbol: wrong packet type: ' pkt.type]);		
 end

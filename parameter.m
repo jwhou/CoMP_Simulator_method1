@@ -11,7 +11,7 @@
 % Parameters from CoMP_sim
 global Num_AP Num_User;
 % Debug parameters
-global event_Debug detail_Debug power_Debug MIMO_Debug queue_Debug powercontrol_Debug control_frame_Debug sounding_skipevent_Debug control_intf_skip_Debug;
+global event_Debug detail_Debug power_Debug MIMO_Debug queue_Debug powercontrol_Debug control_frame_Debug sounding_skipevent_Debug control_intf_skip_Debug data_frame_Debug;
 % some distances for making decision
 global all_STA_distance;
 global def_CoMP_L cover_range;
@@ -38,7 +38,8 @@ global DataSentSucceessed DataSent DataSentFailNotRx DataSentFailNoACK;
 global Interferencepkt InterferenceDatapkt InterferenceCtrlpkt; 
 global CoMPdone CoMPfail CoMPfailbutsave Soundingdone;
 global DebugDataTime DebugBOTime soundingIndex;
-global Pr_edge;  %added by jing-wen
+global low_power;  %added by jing-wen
+global low_cover_range %added by jing-wen
 global ClusterSize; %add by jing-wen
 global Max_Report_P; %add by jing-wen
 global PHY_CH_module;
@@ -93,6 +94,7 @@ sounding_skipevent_Debug = 1; %added by jing-wen
 control_intf_skip_Debug = 1; %added by jing-wen
 powercontrol_Debug = 0;  %added by jing-wen
 control_frame_Debug = 1; %added by jing-wen, Make control frame packet error rate = 0
+data_frame_Debug = 0; %added by jing-wen, Make data frame packet error rate = 0
 
 % ==== AP+User to AP+User distances ====
 all_STA_distance = zeros(numSTAs, numSTAs); % Distances of (APs+Users) by (APs+Users), unit meter 
@@ -102,6 +104,7 @@ def_CoMP_L = 75; % The maximum distance for a pair of APs doing CoMP transmissio
 % db(log_normal_shadowing(0.2, 1, 1, 3e8/5e9, 1, 2.5, 0.1, 1, 100)/white_noise_variance, 'power') = 10.0044 dB
 % white_noise_variance = 4.6511e-012 and log_normal_shadowing(0.2, 1, 1, 3e8/5e9, 1, 2.5, 0.1, 1, 100) = 4.6558e-011
 cover_range = 50; % unit meter
+low_cover_range = 50 * 0.7; % unit meter
 %cover_range = 100; % unit meter
 
 % =========== PHY parameters ===========
@@ -118,9 +121,9 @@ end
 % Dynmic MCS, please see estimate_SNR.m, PER_approximation.m and Init_CoMPpkt.m for details
 % which involves A-MSDU or A-MPDU (global variable: Mode_AMPDU_AMSDU)
 MCS_ctrl = 1; % MCS for contorl frames
-MCSAlgo = 0; % Dynamic MCS = 1, Static MCS = 0
+MCSAlgo = 1; % Dynamic MCS = 1, Static MCS = 0
 per_order = 1e-2; % input argument for PER_approximation.m
-MCS = 2; % Static MCS: 64-QAM 5/6
+MCS = 3; % Static MCS: 64-QAM 5/6
 
 % 802.11ac P.297 PHYdata for VHT MCSs
 % R_data(MCS0-9, BandWidth 20/40/80/160 MHz, Guard Interval, Number of spatial stream);
@@ -221,6 +224,7 @@ SymbolTime = [4, 3.6] * 1e-6; % T_SYML = 4 us(GI = 800 ns), T_SYMS = 3.6 us(GI =
 rmodel = 'shadowing';
 % The transmission power of most APs ranges from 1 mW up to 100 mW, 20 dBm = 0.1 Watts
 default_power = 0.316; % The unit is Watts, 10*log10(200 mw/1mw) is about 25 dBm
+low_power = default_power * 0.7; % The unit is Watts, 10*log10(200 mw/1mw) is about 23.236 dBm
 Gt = 1;
 Gr = 1;
 freq = 5e9; % IEEE 802.11ac
@@ -231,7 +235,6 @@ hr = 1; % Unit is meter
 pathLossExp = 2.5;
 std_db = 0.1; % variance used in shadowing (approximately: 10^(std_db/10) = 2%)
 d0 = 1; % reference distance used in shadowing
-Pr_edge = 4.655839604247911e-11; % for power control added by jing-wen
 % Find N0
 % Note: for all three radio propagation models, they are almost the same
 % when d is not too large or the log-normal fading is not large.
