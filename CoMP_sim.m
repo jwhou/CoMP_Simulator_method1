@@ -26,6 +26,7 @@ global scheme;
 % scheme_quantity = [1,2,3];
 scheme_quantity = [1,2,3]; % testing by shuyu 
 RTS_quantity = [0,1]; %testing by jing-wen  0: no RTS, 1: Typical RTS, 2: RTS Simultaneously
+CoMP_quantity = [1]; %testing by jing-wen  0: CS/CB, 1: JT, 2: Network MIMO
 lastsounding_enable = 0; %testing by jing-wen  0: no record, 1: record
 run_quantity = [1];
 envAPmodel = -2; % [-2:specail case, -1: Fixed AP location, 0: Square grid, 1:Hexagonal grid, 2: PPP]
@@ -229,7 +230,7 @@ for ind0=1:length(run_quantity)
                         center_throughput = [center_throughput, separate_statics(sel_STA)];
                         num_center = num_center + 1;
                     else
-                        if (scheme == 2)
+                        if (scheme ~= 1)
                             if ~isempty(STA_Info(i).CoMP_coordinator)
                                 if ismember(sel_STA, STA_Info(STA_Info(i).CoMP_coordinator).cover_STA)
                                     edge_CoMP_throughput = [edge_CoMP_throughput, separate_statics(sel_STA)];
