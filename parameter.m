@@ -60,7 +60,7 @@ soundingIndex = 0;
 numSTAs = Num_AP + Num_User;
 % ========== Our 802.11ac channel model ========== 
 PHY_CH_module = 'new'; %old:shuyu; new:new
-select_algo = 1; %0:°µMU-SISOºÉ¶qªA°È¨ì³Ì¦huser 1:°µMU-MIMO:2-2,4-2,4-4,6-2
+select_algo = 1; %0:åšMU-SISOç›¡é‡æœå‹™åˆ°æœ€å¤šuser 1:åšMU-MIMO:2-2,4-2,4-4,6-2
 Npkt=30;
 Npkt_length=1;% parameter use in fc_beamtracking.m
 AI=[1 -1 2 3 4 5 -2 -3 -4 -5 0];
@@ -94,7 +94,7 @@ sounding_skipevent_Debug = 1; %added by jing-wen
 control_intf_skip_Debug = 1; %added by jing-wen
 powercontrol_Debug = 0;  %added by jing-wen
 control_frame_Debug = 1; %added by jing-wen, Make control frame packet error rate = 0
-data_frame_Debug = 0; %added by jing-wen, Make data frame packet error rate = 0
+data_frame_Debug = 1; %added by jing-wen, Make data frame packet error rate = 0
 
 % ==== AP+User to AP+User distances ====
 all_STA_distance = zeros(numSTAs, numSTAs); % Distances of (APs+Users) by (APs+Users), unit meter 
@@ -121,7 +121,7 @@ end
 % Dynmic MCS, please see estimate_SNR.m, PER_approximation.m and Init_CoMPpkt.m for details
 % which involves A-MSDU or A-MPDU (global variable: Mode_AMPDU_AMSDU)
 MCS_ctrl = 1; % MCS for contorl frames
-MCSAlgo = 1; % Dynamic MCS = 1, Static MCS = 0
+MCSAlgo = 0; % Dynamic MCS = 1, Static MCS = 0
 per_order = 1e-2; % input argument for PER_approximation.m
 MCS = 3; % Static MCS: 64-QAM 5/6
 
