@@ -32,7 +32,7 @@ global DataSentSucceessed DataSent DataSentFailNotRx DataSentFailNoACK;
 global Interferencepkt InterferenceDatapkt InterferenceCtrlpkt;
 global CoMPfail CoMPfailbutsave CoMPdone;
 global DebugDataTime DebugBOTime;
-global RTS_method;
+global RTS_method scheme;
 global lastsounding_enable;
 global cover_range;
 global Max_Report_P;
@@ -142,155 +142,85 @@ switch event.type
                     TempEvent.pkt.MU = 1;
                 end
                 TempEvent.pkt.CoMP = 0;
-                %==============channel module==============%
-                switch PHY_CH_module
-                    case 'old'
-                        if (TempEvent.pkt.MU == 0 && TempEvent.pkt.CoMP == 0)
-                            if (MCSAlgo == 1)
-                                % Dynamic MCS
-                                SNR_record = estimate_SNR(TempEvent.pkt);
-                                [TempEvent.pkt.MCS_index, ~, Num_Aggregate] = PER_approximation(per_order, SNR_record, TempEvent.pkt);
-                                TempEvent.pkt.rate = R_data(TempEvent.pkt.MCS_index, BW, GI, 1);
-                                TempEvent.pkt.size = size_MAC_body*Num_Aggregate;
-                            elseif (MCSAlgo == 0)
-                                % Static MCS
-                                Num_Aggregate = ceil(R_data(MCS, BW, GI, 1)/R_data(MCS_ctrl, BW, GI, 1));
-                                TempEvent.pkt.MCS_index = MCS;
-                                TempEvent.pkt.rate = R_data(TempEvent.pkt.MCS_index, BW, GI, 1);
-                                TempEvent.pkt.size = size_MAC_body*Num_Aggregate;
-                            end
-                            
-                            TempEvent.pkt.sounding_index = ((t - STA_Info(i).CSI_TS([TempEvent.pkt.rv]-Num_AP)) >= soundingperiod);
-                            TempEvent.pkt.sum_sounding = sum(TempEvent.pkt.sounding_index);
-                            switch RTS_method
-                                case 0
-                                    if TempEvent.pkt.sum_sounding > 0
-                                        TempEvent.pkt.nav = SIFS + NDPTime + SIFS + CompressedBeamformingTime;
-                                    else
-                                        TempEvent.pkt.nav = SIFS + ACK_tx_time;
-                                    end
-                                case 1
-                                    if TempEvent.pkt.sum_sounding > 0
-                                        TempEvent.pkt.nav = SIFS + NDPTime + SIFS + CompressedBeamformingTime;
-                                    else
-                                        TempEvent.pkt.nav = SIFS + CTS_tx_time + SIFS +tx_time(TempEvent.pkt)+ SIFS + ACK_tx_time;
-                                    end
-                            end
-                            
-                        elseif (TempEvent.pkt.MU == 1 && TempEvent.pkt.CoMP == 0)
-                            % Only AP could transmit MU-PPDU
-                            if (MCSAlgo == 1)
-                                % Dynamic MCS
-                                SNR_record = estimate_SNR(TempEvent.pkt);
-                                [TempEvent.pkt.MCS_index, ~, Num_Aggregate] = PER_approximation(per_order, SNR_record, TempEvent.pkt);
-                                TempEvent.pkt.rate = R_data(TempEvent.pkt.MCS_index, BW, GI, 1);
-                                TempEvent.pkt.size = size_MAC_body*Num_Aggregate;
-                            elseif (MCSAlgo == 0)
-                                % Static MCS
-                                Num_Aggregate = ones(length(TempEvent.pkt.rv), 1)*ceil(R_data(MCS, BW, GI, 1)/R_data(MCS_ctrl, BW, GI, 1));
-                                TempEvent.pkt.MCS_index = MCS*ones(length(TempEvent.pkt.rv),1);
-                                TempEvent.pkt.rate = R_data(TempEvent.pkt.MCS_index, BW, GI, 1);
-                                TempEvent.pkt.size = size_MAC_body*Num_Aggregate;
-                            end
-                            
-                            TempEvent.pkt.sounding_index = ((t - STA_Info(i).CSI_TS([TempEvent.pkt.rv]-Num_AP)) >= soundingperiod);
-                            TempEvent.pkt.sum_sounding = sum(TempEvent.pkt.sounding_index);
-                            switch RTS_method
-                                case 0
-                                    if TempEvent.pkt.sum_sounding > 0
-                                        TempEvent.pkt.nav = SIFS + NDPTime + SIFS + CompressedBeamformingTime + (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime);
-                                    else
-                                        TempEvent.pkt.nav = length(TempEvent.pkt.rv)*(SIFS + ACK_tx_time);
-                                    end
-                                case 1
-                                    if TempEvent.pkt.sum_sounding > 0
-                                        TempEvent.pkt.nav = SIFS + NDPTime + SIFS + CompressedBeamformingTime + (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime);
-                                    else
-                                        TempEvent.pkt.nav = length(TempEvent.pkt.rv)*(SIFS+CTS_tx_time)+SIFS+tx_time(TempEvent.pkt)+length(TempEvent.pkt.rv)*(SIFS+ACK_tx_time);
-                                    end
-                            end
+                    
+                if (TempEvent.pkt.MU == 0 && TempEvent.pkt.CoMP == 0)
+                    TempEvent.pkt.sounding_index = ((t - STA_Info(i).CSI_TS([TempEvent.pkt.rv]-Num_AP)) >= soundingperiod);
+                    TempEvent.pkt.sum_sounding = sum(TempEvent.pkt.sounding_index);
+                    if (MCSAlgo == 1)
+                        % Dynamic MCS
+                        if TempEvent.pkt.sum_sounding > 0
+                            TempEvent.pkt.MCS_index = MCS_ctrl;
+                        else
+                            TempEvent.pkt.MCS_index = STA_Info(i).MCS_record(select_rv - Num_AP);
                         end
-                    case 'new'
-                        if (TempEvent.pkt.MU == 0 && TempEvent.pkt.CoMP == 0)
-                            TempEvent.pkt.sounding_index = ((t - STA_Info(i).CSI_TS([TempEvent.pkt.rv]-Num_AP)) >= soundingperiod);
-                            TempEvent.pkt.sum_sounding = sum(TempEvent.pkt.sounding_index);
-                            if (MCSAlgo == 1) 
-                                % Dynamic MCS
-                                if TempEvent.pkt.sum_sounding > 0
-                                    TempEvent.pkt.MCS_index = MCS_ctrl;
-                                else
-                                    TempEvent.pkt.MCS_index = STA_Info(i).MCS_record(select_rv - Num_AP);
-                                end
-                                TempEvent.pkt.rate = R_data(TempEvent.pkt.MCS_index, BW, GI, spatial_stream);
-                                [Num_Aggregate,num_msdu]=fc_packet_aggregation(TempEvent.pkt.rate,i,select_rv);
-                                TempEvent.pkt.size = size_MAC_body*num_msdu*Num_Aggregate;
-                            elseif (MCSAlgo == 0)
-                                % Static MCS
-                                if TempEvent.pkt.sum_sounding > 0
-                                    TempEvent.pkt.MCS_index = MCS_ctrl;
-                                else
-                                    TempEvent.pkt.MCS_index = MCS;
-                                end
-                                TempEvent.pkt.rate = R_data(TempEvent.pkt.MCS_index, BW, GI, spatial_stream);
-                                [Num_Aggregate,num_msdu]=fc_packet_aggregation(TempEvent.pkt.rate,i,select_rv);
-                                TempEvent.pkt.size = size_MAC_body*num_msdu*Num_Aggregate;
-                            end
-                            switch RTS_method
-                                case 0
-                                    if TempEvent.pkt.sum_sounding > 0
-                                        TempEvent.pkt.nav = SIFS + NDPTime + SIFS + CompressedBeamformingTime;
-                                    else
-                                        TempEvent.pkt.nav = SIFS + ACK_tx_time;
-                                    end
-                                case 1
-                                    if TempEvent.pkt.sum_sounding > 0
-                                        TempEvent.pkt.nav = SIFS + NDPTime + SIFS + CompressedBeamformingTime;
-                                    else
-                                        TempEvent.pkt.nav = SIFS + CTS_tx_time + SIFS +tx_time(TempEvent.pkt)+ SIFS + ACK_tx_time;
-                                    end
-                            end
-                        elseif (TempEvent.pkt.MU == 1 && TempEvent.pkt.CoMP == 0)
-                            TempEvent.pkt.sounding_index = ((t - STA_Info(i).CSI_TS([TempEvent.pkt.rv]-Num_AP)) >= soundingperiod);
-                            TempEvent.pkt.sum_sounding = sum(TempEvent.pkt.sounding_index);
-                            % Only AP could transmit MU-PPDU                   
-                            if (MCSAlgo == 1) 
-                                % Dynamic MCS
-                                if TempEvent.pkt.sum_sounding > 0
-                                    TempEvent.pkt.MCS_index = MCS_ctrl*ones(1, length(select_rv));
-                                else
-                                    TempEvent.pkt.MCS_index = STA_Info(i).MCS_record(select_rv - Num_AP);
-                                end
-                                TempEvent.pkt.rate = R_data(TempEvent.pkt.MCS_index, BW, GI, spatial_stream);
-                                [Num_Aggregate,num_msdu]=fc_packet_aggregation(TempEvent.pkt.rate,i,select_rv);
-                                TempEvent.pkt.size = size_MAC_body*num_msdu*Num_Aggregate;
-                            elseif (MCSAlgo == 0)
-                                % Static MCS
-                                if TempEvent.pkt.sum_sounding > 0
-                                    TempEvent.pkt.MCS_index = MCS_ctrl*ones(1, length(select_rv));
-                                else
-                                    TempEvent.pkt.MCS_index = MCS*ones(1, length(TempEvent.pkt.rv));
-                                end
-                                TempEvent.pkt.rate = R_data(TempEvent.pkt.MCS_index, BW, GI, spatial_stream);
-                                [Num_Aggregate,num_msdu]=fc_packet_aggregation(TempEvent.pkt.rate,i,select_rv);
-                                TempEvent.pkt.size = size_MAC_body*num_msdu*Num_Aggregate;
-                            end
-                            switch RTS_method
-                                case 0
-                                    if TempEvent.pkt.sum_sounding > 0
-                                        TempEvent.pkt.nav = SIFS + NDPTime + SIFS + CompressedBeamformingTime + (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime);
-                                    else
-                                        TempEvent.pkt.nav = length(TempEvent.pkt.rv)*(SIFS + ACK_tx_time);
-                                    end
-                                case 1
-                                    if TempEvent.pkt.sum_sounding > 0
-                                        TempEvent.pkt.nav = SIFS + NDPTime + SIFS + CompressedBeamformingTime + (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime);
-                                    else
-                                        TempEvent.pkt.nav = length(TempEvent.pkt.rv)*(SIFS+CTS_tx_time)+SIFS+tx_time(TempEvent.pkt)+length(TempEvent.pkt.rv)*(SIFS+ACK_tx_time);
-                                    end
-                            end
+                        TempEvent.pkt.rate = R_data(TempEvent.pkt.MCS_index, BW, GI, spatial_stream);
+                        [Num_Aggregate,num_msdu]=fc_packet_aggregation(TempEvent.pkt.rate,i,select_rv);
+                        TempEvent.pkt.size = size_MAC_body*num_msdu*Num_Aggregate;
+                    elseif (MCSAlgo == 0)
+                        % Static MCS
+                        if TempEvent.pkt.sum_sounding > 0
+                            TempEvent.pkt.MCS_index = MCS_ctrl;
+                        else
+                            TempEvent.pkt.MCS_index = MCS;
                         end
+                        TempEvent.pkt.rate = R_data(TempEvent.pkt.MCS_index, BW, GI, spatial_stream);
+                        [Num_Aggregate,num_msdu]=fc_packet_aggregation(TempEvent.pkt.rate,i,select_rv);
+                        TempEvent.pkt.size = size_MAC_body*num_msdu*Num_Aggregate;
+                    end
+                    switch RTS_method
+                        case 0
+                            if TempEvent.pkt.sum_sounding > 0
+                                TempEvent.pkt.nav = SIFS + NDPTime + SIFS + CompressedBeamformingTime;
+                            else
+                                TempEvent.pkt.nav = SIFS + ACK_tx_time;
+                            end
+                        case 1
+                            if TempEvent.pkt.sum_sounding > 0
+                                TempEvent.pkt.nav = SIFS + NDPTime + SIFS + CompressedBeamformingTime;
+                            else
+                                TempEvent.pkt.nav = SIFS + CTS_tx_time + SIFS +tx_time(TempEvent.pkt)+ SIFS + ACK_tx_time;
+                            end
+                    end
+                elseif (TempEvent.pkt.MU == 1 && TempEvent.pkt.CoMP == 0)
+                    TempEvent.pkt.sounding_index = ((t - STA_Info(i).CSI_TS([TempEvent.pkt.rv]-Num_AP)) >= soundingperiod);
+                    TempEvent.pkt.sum_sounding = sum(TempEvent.pkt.sounding_index);
+                    % Only AP could transmit MU-PPDU
+                    if (MCSAlgo == 1)
+                        % Dynamic MCS
+                        if TempEvent.pkt.sum_sounding > 0
+                            TempEvent.pkt.MCS_index = MCS_ctrl*ones(1, length(select_rv));
+                        else
+                            TempEvent.pkt.MCS_index = STA_Info(i).MCS_record(select_rv - Num_AP);
+                        end
+                        TempEvent.pkt.rate = R_data(TempEvent.pkt.MCS_index, BW, GI, spatial_stream);
+                        [Num_Aggregate,num_msdu]=fc_packet_aggregation(TempEvent.pkt.rate,i,select_rv);
+                        TempEvent.pkt.size = size_MAC_body*num_msdu*Num_Aggregate;
+                    elseif (MCSAlgo == 0)
+                        % Static MCS
+                        if TempEvent.pkt.sum_sounding > 0
+                            TempEvent.pkt.MCS_index = MCS_ctrl*ones(1, length(select_rv));
+                        else
+                            TempEvent.pkt.MCS_index = MCS*ones(1, length(TempEvent.pkt.rv));
+                        end
+                        TempEvent.pkt.rate = R_data(TempEvent.pkt.MCS_index, BW, GI, spatial_stream);
+                        [Num_Aggregate,num_msdu]=fc_packet_aggregation(TempEvent.pkt.rate,i,select_rv);
+                        TempEvent.pkt.size = size_MAC_body*num_msdu*Num_Aggregate;
+                    end
+                    switch RTS_method
+                        case 0
+                            if TempEvent.pkt.sum_sounding > 0
+                                TempEvent.pkt.nav = SIFS + NDPTime + SIFS + CompressedBeamformingTime + (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime);
+                            else
+                                TempEvent.pkt.nav = length(TempEvent.pkt.rv)*(SIFS + ACK_tx_time);
+                            end
+                        case 1
+                            if TempEvent.pkt.sum_sounding > 0
+                                TempEvent.pkt.nav = SIFS + NDPTime + SIFS + CompressedBeamformingTime + (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime);
+                            else
+                                TempEvent.pkt.nav = length(TempEvent.pkt.rv)*(SIFS+CTS_tx_time)+SIFS+tx_time(TempEvent.pkt)+length(TempEvent.pkt.rv)*(SIFS+ACK_tx_time);
+                            end
+                    end
                 end
-                %==============channel module==============%
                 % STA i is an AP and already knows which APs are coordinators of CoMP transmission
                 if (~isempty(STA_Info(i).CoMP_coordinator))
                     % A CoMP AP informs the CoMP_Controller to initialize CoMP transmission
@@ -332,49 +262,69 @@ switch event.type
             end
         end
         if (STA(i, 3) == 0 && event.pkt.MU == 1 && event.pkt.CoMP == 1 && CoMP_Controller.information(i).numInform ~= 0)
-            if (CoMP_Controller.information(i).reset == 1)
-                CoMP_Controller.information(i).numInform = 0;
-            elseif (strcmp(event.pkt.type, 'RTS') == 1)
-                backoff_counter(i) = 0;
-                CoMP_Controller.information(i).numInform = 0;
-                if (any(CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1))
-                    TempEvent = event;
-                    TempEvent.type = 'MUNDP_response';
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
-                else
-                    FirstCoMPAP = CoMP_Controller.information(i).startorder(1);
-                    TempEvent = event;
-                    TempEvent.type = 'send_PHY';
-                    TempEvent.timer = CoMP_Controller.information(FirstCoMPAP).sendRTS_time(i);
-                    TempEvent.pkt.nav = CoMP_Controller.information(FirstCoMPAP).nav(i);
-                    TempEvent.pkt.sendDataTime = CoMP_Controller.information(FirstCoMPAP).sendData_time;
-                    TempEvent.pkt.endTxTime = CoMP_Controller.information(FirstCoMPAP).endCoMPtransmission_time;
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' wait to send ' num2str(event.pkt.type) '.']); end
-                end
-            elseif (strcmp(event.pkt.type, 'Data') == 1)
-                backoff_counter(i) = 0;
-                CoMP_Controller.information(i).numInform = 0;
-                if (CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1)
-                    TempEvent = event;
-                    TempEvent.type = 'MUNDP_response';
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                end
-                if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
-            elseif (strcmp(event.pkt.type, 'NDP_Ann') == 1)
-                FirstAP = CoMP_Controller.information(i).startorder(1);
-                backoff_counter(i) = 0;
-                CoMP_Controller.information(i).numInform = 0;
-                if CoMP_Controller.information(FirstAP).readyRTS == 1
-                    if sounding_skipevent_Debug == 0
-                        TempEvent = event;
-                        TempEvent.timer = t;
-                        TempEvent.type = 'send_PHY';
-                        TempEvent.STA_ID = i;
-                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' start sounding because STA ' num2str(FirstAP) ' readyRTS == 1']); end
+            if scheme == 3
+                if (strcmp(event.pkt.type, 'RTS') == 1)
+                    backoff_counter(i) = 0;
+                    CoMP_Controller.information(i).numInform = 0;
+                    if (any(CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1))
+                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
                     else
+                        FirstCoMPAP = CoMP_Controller.information(i).startorder(1);
+                        TempEvent = event;
+                        TempEvent.type = 'send_PHY';
+                        TempEvent.timer = CoMP_Controller.information(FirstCoMPAP).sendRTS_time(i);
+                        TempEvent.pkt.nav = CoMP_Controller.information(FirstCoMPAP).nav(i);
+                        TempEvent.pkt.sendDataTime = CoMP_Controller.information(FirstCoMPAP).sendData_time;
+                        TempEvent.pkt.endTxTime = CoMP_Controller.information(FirstCoMPAP).endCoMPtransmission_time;
+                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' wait to send ' num2str(event.pkt.type) '.']); end
+                    end
+                elseif (strcmp(event.pkt.type, 'Data') == 1)
+                    backoff_counter(i) = 0;
+                    CoMP_Controller.information(i).numInform = 0;
+                    if (CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1)
+                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
+                    end
+                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
+                elseif (strcmp(event.pkt.type, 'NDP_Ann') == 1)
+                    backoff_counter(i) = 0;
+                    CoMP_Controller.information(i).numInform = 0;
+                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
+                end
+            else
+                if (strcmp(event.pkt.type, 'RTS') == 1)
+                    backoff_counter(i) = 0;
+                    CoMP_Controller.information(i).numInform = 0;
+                    if (any(CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1))
+                        TempEvent = event;
+                        TempEvent.type = 'MUNDP_response';
+                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
+                    else
+                        FirstCoMPAP = CoMP_Controller.information(i).startorder(1);
+                        TempEvent = event;
+                        TempEvent.type = 'send_PHY';
+                        TempEvent.timer = CoMP_Controller.information(FirstCoMPAP).sendRTS_time(i);
+                        TempEvent.pkt.nav = CoMP_Controller.information(FirstCoMPAP).nav(i);
+                        TempEvent.pkt.sendDataTime = CoMP_Controller.information(FirstCoMPAP).sendData_time;
+                        TempEvent.pkt.endTxTime = CoMP_Controller.information(FirstCoMPAP).endCoMPtransmission_time;
+                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' wait to send ' num2str(event.pkt.type) '.']); end
+                    end
+                elseif (strcmp(event.pkt.type, 'Data') == 1)
+                    backoff_counter(i) = 0;
+                    CoMP_Controller.information(i).numInform = 0;
+                    if (CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1)
+                        TempEvent = event;
+                        TempEvent.type = 'MUNDP_response';
+                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                    end
+                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
+                elseif (strcmp(event.pkt.type, 'NDP_Ann') == 1)
+                    FirstAP = CoMP_Controller.information(i).startorder(1);
+                    backoff_counter(i) = 0;
+                    CoMP_Controller.information(i).numInform = 0;
+                    if CoMP_Controller.information(FirstAP).readyRTS == 1
                         TempEvent = event;
                         TempEvent.timer = t + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
                             (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime)+eps;
@@ -415,56 +365,76 @@ switch event.type
         end
         if event_Debug, disp(['[' num2str(t, '%1.20f') ']: backoff_start @ STA ' num2str(i)]); end
         if (STA(i, 3) == 0 && event.pkt.MU == 1 && event.pkt.CoMP == 1 && CoMP_Controller.information(i).numInform ~= 0)
-            if (CoMP_Controller.information(i).reset == 1)
-                CoMP_Controller.information(i).numInform = 0;
-            elseif (strcmp(event.pkt.type, 'RTS') == 1)
-                backoff_counter(i) = 0;
-                CoMP_Controller.information(i).numInform = 0;
-                if (CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1)
-                    TempEvent = event;
-                    TempEvent.type = 'MUNDP_response';
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
-                else
-                    FirstCoMPAP = CoMP_Controller.information(i).startorder(1);
-                    TempEvent = event;
-                    TempEvent.type = 'send_PHY';
-                    TempEvent.timer = CoMP_Controller.information(FirstCoMPAP).sendRTS_time(i);
-                    TempEvent.pkt.nav = CoMP_Controller.information(FirstCoMPAP).nav(i);
-                    TempEvent.pkt.sendDataTime = CoMP_Controller.information(FirstCoMPAP).sendData_time;
-                    TempEvent.pkt.endTxTime = CoMP_Controller.information(FirstCoMPAP).endCoMPtransmission_time;
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' wait to send ' num2str(event.pkt.type) '.']); end
-                end
-            elseif (strcmp(event.pkt.type, 'Data') == 1)
-                backoff_counter(i) = 0;
-                CoMP_Controller.information(i).numInform = 0;
-                if (CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1)
-                    TempEvent = event;
-                    TempEvent.type = 'MUNDP_response';
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                end
-                if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
-            elseif (strcmp(event.pkt.type, 'NDP_Ann') == 1)
-                FirstAP = CoMP_Controller.information(i).startorder(1);
-                backoff_counter(i) = 0;
-                CoMP_Controller.information(i).numInform = 0;
-                if CoMP_Controller.information(FirstAP).readyRTS == 1
-                    if sounding_skipevent_Debug == 0
-                        TempEvent = event;
-                        TempEvent.timer = t;
-                        TempEvent.type = 'send_PHY';
-                        TempEvent.STA_ID = i;
-                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' start sounding because STA ' num2str(FirstAP) ' readyRTS == 1']); end
+            if scheme == 3
+                if (strcmp(event.pkt.type, 'RTS') == 1)
+                    backoff_counter(i) = 0;
+                    CoMP_Controller.information(i).numInform = 0;
+                    if (CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1)
+                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
                     else
+                        FirstCoMPAP = CoMP_Controller.information(i).startorder(1);
+                        TempEvent = event;
+                        TempEvent.type = 'send_PHY';
+                        TempEvent.timer = CoMP_Controller.information(FirstCoMPAP).sendRTS_time(i);
+                        TempEvent.pkt.nav = CoMP_Controller.information(FirstCoMPAP).nav(i);
+                        TempEvent.pkt.sendDataTime = CoMP_Controller.information(FirstCoMPAP).sendData_time;
+                        TempEvent.pkt.endTxTime = CoMP_Controller.information(FirstCoMPAP).endCoMPtransmission_time;
+                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' wait to send ' num2str(event.pkt.type) '.']); end
+                    end
+                elseif (strcmp(event.pkt.type, 'Data') == 1)
+                    backoff_counter(i) = 0;
+                    CoMP_Controller.information(i).numInform = 0;
+                    if (CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1)
+                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
+                    end
+                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
+                elseif (strcmp(event.pkt.type, 'NDP_Ann') == 1)
+                    backoff_counter(i) = 0;
+                    CoMP_Controller.information(i).numInform = 0;
+                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
+                end
+            else
+                if (strcmp(event.pkt.type, 'RTS') == 1)
+                    backoff_counter(i) = 0;
+                    CoMP_Controller.information(i).numInform = 0;
+                    if (CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1)
+                        TempEvent = event;
+                        TempEvent.type = 'MUNDP_response';
+                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
+                    else
+                        FirstCoMPAP = CoMP_Controller.information(i).startorder(1);
+                        TempEvent = event;
+                        TempEvent.type = 'send_PHY';
+                        TempEvent.timer = CoMP_Controller.information(FirstCoMPAP).sendRTS_time(i);
+                        TempEvent.pkt.nav = CoMP_Controller.information(FirstCoMPAP).nav(i);
+                        TempEvent.pkt.sendDataTime = CoMP_Controller.information(FirstCoMPAP).sendData_time;
+                        TempEvent.pkt.endTxTime = CoMP_Controller.information(FirstCoMPAP).endCoMPtransmission_time;
+                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' wait to send ' num2str(event.pkt.type) '.']); end
+                    end
+                elseif (strcmp(event.pkt.type, 'Data') == 1)
+                    backoff_counter(i) = 0;
+                    CoMP_Controller.information(i).numInform = 0;
+                    if (CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1)
+                        TempEvent = event;
+                        TempEvent.type = 'MUNDP_response';
+                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                    end
+                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
+                elseif (strcmp(event.pkt.type, 'NDP_Ann') == 1)
+                    FirstAP = CoMP_Controller.information(i).startorder(1);
+                    backoff_counter(i) = 0;
+                    CoMP_Controller.information(i).numInform = 0;
+                    if CoMP_Controller.information(FirstAP).readyRTS == 1
                         TempEvent = event;
                         TempEvent.timer = t + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
                             (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime)+eps;
                         TempEvent.type = 'CBF_timeout';
                         TempEvent.STA_ID = i;
                         NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' start sounding because STA ' num2str(FirstAP) ' readyRTS == 1']); end
+                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' start sounding because STA ' num2str(FirstAP) ' readyRTS == 1']); end                        
                     end
                 end
             end
@@ -485,78 +455,146 @@ switch event.type
                         if (STA(i, 3) == 0 && event.pkt.MU == 1 && event.pkt.CoMP == 1)
                             if (CoMP_Controller.information(i).numInform == 0)
                                 CoMP_Controller.information(i).startorder = [i, STA_Info(i).CoMP_coordinator];
-                                CoMP_Controller.information(i).reset = 0;
                                 % The first CoMP AP access to channel then inform other CoMP APs through CoMP_Controller
                                 temp = STA_Info(i).CoMP_coordinator;
                                 for k=1:length(temp)
                                     CoMP_Controller.information(temp(k)).numInform = 2;
-                                    CoMP_Controller.information(temp(k)).reset = 0;
                                     CoMP_Controller.information(temp(k)).startorder = CoMP_Controller.information(i).startorder;
                                 end
-                                if CoMP_Controller.information(i).readyRTS == 1
-                                    if all(CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS) == 1
-                                        if (strcmp(event.pkt.type, 'RTS') == 1)
-                                            if RTS_method == 1
-                                                all_pkt_nav = [];
-                                                for k=1:length(CoMP_Controller.information(i).startorder)
-                                                    AP_index = CoMP_Controller.information(i).startorder(k);
-                                                    all_pkt_nav = [all_pkt_nav, CoMP_Controller.information(AP_index).pkt.nav];
+                                if scheme == 3
+                                    if CoMP_Controller.information(i).readyRTS == 1
+                                        if all(CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS) == 1
+                                            if (strcmp(event.pkt.type, 'RTS') == 1)
+                                                if RTS_method == 1
+                                                    all_pkt_nav = [];
+                                                    for k=1:length(CoMP_Controller.information(i).startorder)
+                                                        AP_index = CoMP_Controller.information(i).startorder(k);
+                                                        all_pkt_nav = [all_pkt_nav, CoMP_Controller.information(AP_index).pkt.nav];
+                                                    end
+                                                    event.pkt.nav = max(all_pkt_nav); %find out maximum pkt.nav
+                                                    for k=1:length(STA_Info(i).CoMP_coordinator)
+                                                        CoMP_Controller.information(STA_Info(i).CoMP_coordinator(k)).numInform = 1;
+                                                        CoMP_Controller.information(STA_Info(i).CoMP_coordinator(k)).startorder = [i, STA_Info(i).CoMP_coordinator];
+                                                        CoMP_Controller.information(i).nav(STA_Info(i).CoMP_coordinator(k)) = event.pkt.nav - k * (SIFS + RTS_tx_time);
+                                                        CoMP_Controller.information(i).sendRTS_time(STA_Info(i).CoMP_coordinator(k)) = t + k * (RTS_tx_time + SIFS);
+                                                    end
+                                                    CoMP_Controller.information(i).sendData_time = t+(length(STA_Info(i).CoMP_coordinator)+1)*(RTS_tx_time+SIFS)+...
+                                                        length(event.pkt.rv)*(CTS_tx_time+SIFS);
+                                                    CoMP_Controller.information(i).endCoMPtransmission_time = t + event.pkt.nav + RTS_tx_time;
+                                                    TempEvent.pkt.endTxTime = CoMP_Controller.information(i).endCoMPtransmission_time;
+                                                    
+                                                    NewEvents = [TempEvent, NewEvents]; clear TempEvent;
+                                                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' is ready to send ' num2str(event.pkt.type) '.']); end
+                                                else %RTS_method ==2
+                                                    %Not done here.
                                                 end
-                                                event.pkt.nav = max(all_pkt_nav); %find out maximum pkt.nav
-                                                for k=1:length(STA_Info(i).CoMP_coordinator)
-                                                    CoMP_Controller.information(STA_Info(i).CoMP_coordinator(k)).numInform = 1;
-                                                    CoMP_Controller.information(STA_Info(i).CoMP_coordinator(k)).startorder = [i, STA_Info(i).CoMP_coordinator];
-                                                    CoMP_Controller.information(i).nav(STA_Info(i).CoMP_coordinator(k)) = event.pkt.nav - k * (SIFS + RTS_tx_time);
-                                                    CoMP_Controller.information(i).sendRTS_time(STA_Info(i).CoMP_coordinator(k)) = t + k * (RTS_tx_time + SIFS);
+                                            elseif (strcmp(event.pkt.type, 'Data') == 1)
+                                                temp = CoMP_Controller.information(i).startorder;
+                                                for k=1:length(temp)
+                                                    CoMPAP_index = temp(k);
+                                                    % send DATA
+                                                    TempEvent = event;
+                                                    TempEvent.timer = t;
+                                                    TempEvent.type = 'send_PHY';
+                                                    TempEvent.STA_ID = CoMPAP_index;
+                                                    TempEvent.pkt = CoMP_Controller.information(CoMPAP_index).pkt;
+                                                    % Creat a new id for the data packet
+                                                    TempEvent.pkt.id = new_id(CoMPAP_index);
+                                                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                                                    
+                                                    if detail_Debug, disp(['  -D: STA ' num2str(CoMPAP_index) ' is ready to send ' num2str(event.pkt.type) '.']); end
                                                 end
-                                                CoMP_Controller.information(i).sendData_time = t+(length(STA_Info(i).CoMP_coordinator)+1)*(RTS_tx_time+SIFS)+...
-                                                    length(event.pkt.rv)*(CTS_tx_time+SIFS);
-                                                CoMP_Controller.information(i).endCoMPtransmission_time = t + event.pkt.nav + RTS_tx_time;
-                                                TempEvent.pkt.endTxTime = CoMP_Controller.information(i).endCoMPtransmission_time;
-                                                
-                                                NewEvents = [TempEvent, NewEvents]; clear TempEvent;
-                                                if detail_Debug, disp(['  -D: STA ' num2str(i) ' is ready to send ' num2str(event.pkt.type) '.']); end
-                                            else %RTS_method ==2
-                                                %Not done here.
+                                            else
+                                                error 'error pkt.type, when backoff == 0 in CoMP mode';
                                             end
-                                        elseif (strcmp(event.pkt.type, 'Data') == 1)
-                                            temp = CoMP_Controller.information(i).startorder;
-                                            for k=1:length(temp)
-                                                CoMPAP_index = temp(k);
-                                                % send DATA
+                                        else % STA_Info(i).CoMP_coordinator's readyRTS ~= 1
+                                            for k=1:length(CoMP_Controller.information(i).startorder)
+                                                CoMPAP_index = CoMP_Controller.information(i).startorder(k);
                                                 TempEvent = event;
-                                                TempEvent.timer = t;
-                                                TempEvent.type = 'send_PHY';
-                                                TempEvent.STA_ID = CoMPAP_index;
+                                                TempEvent.type = 'CBF_timeout';
                                                 TempEvent.pkt = CoMP_Controller.information(CoMPAP_index).pkt;
-                                                % Creat a new id for the data packet
-                                                TempEvent.pkt.id = new_id(CoMPAP_index);
+                                                TempEvent.timer = t + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
+                                                    (length(TempEvent.pkt.CoMPAll)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime)+eps;
+                                                TempEvent.STA_ID = CoMPAP_index;
                                                 NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                                                
-                                                if detail_Debug, disp(['  -D: STA ' num2str(CoMPAP_index) ' is ready to send ' num2str(event.pkt.type) '.']); end
                                             end
-                                        else
-                                            error 'error pkt.type, when backoff == 0 in CoMP mode';
+                                            if detail_Debug, disp(['  -D: STA ' num2str(i) ' send NDP_Ann.']); end
                                         end
-                                    else % STA_Info(i).CoMP_coordinator's readyRTS ~= 1
-                                        TempEvent = event;
-                                        TempEvent.type = 'MUNDP_response';
-                                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                                    else % CoMP_Controller.information(i).readyRTS ~= 1
+                                        for k=1:length(CoMP_Controller.information(i).startorder)
+                                            CoMPAP_index = CoMP_Controller.information(i).startorder(k);
+                                            TempEvent = event;
+                                            TempEvent.type = 'CBF_timeout';
+                                            TempEvent.pkt = CoMP_Controller.information(CoMPAP_index).pkt;
+                                            TempEvent.timer = t + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
+                                                (length(TempEvent.pkt.CoMPAll)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime)+eps;
+                                            TempEvent.STA_ID = CoMPAP_index;
+                                            NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                                        end
+                                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
                                     end
-                                else % CoMP_Controller.information(i).readyRTS ~= 1
-                                    if sounding_skipevent_Debug == 0
-                                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                                    else
+                                else
+                                    if CoMP_Controller.information(i).readyRTS == 1
+                                        if all(CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS) == 1
+                                            if (strcmp(event.pkt.type, 'RTS') == 1)
+                                                if RTS_method == 1
+                                                    all_pkt_nav = [];
+                                                    for k=1:length(CoMP_Controller.information(i).startorder)
+                                                        AP_index = CoMP_Controller.information(i).startorder(k);
+                                                        all_pkt_nav = [all_pkt_nav, CoMP_Controller.information(AP_index).pkt.nav];
+                                                    end
+                                                    event.pkt.nav = max(all_pkt_nav); %find out maximum pkt.nav
+                                                    for k=1:length(STA_Info(i).CoMP_coordinator)
+                                                        CoMP_Controller.information(STA_Info(i).CoMP_coordinator(k)).numInform = 1;
+                                                        CoMP_Controller.information(STA_Info(i).CoMP_coordinator(k)).startorder = [i, STA_Info(i).CoMP_coordinator];
+                                                        CoMP_Controller.information(i).nav(STA_Info(i).CoMP_coordinator(k)) = event.pkt.nav - k * (SIFS + RTS_tx_time);
+                                                        CoMP_Controller.information(i).sendRTS_time(STA_Info(i).CoMP_coordinator(k)) = t + k * (RTS_tx_time + SIFS);
+                                                    end
+                                                    CoMP_Controller.information(i).sendData_time = t+(length(STA_Info(i).CoMP_coordinator)+1)*(RTS_tx_time+SIFS)+...
+                                                        length(event.pkt.rv)*(CTS_tx_time+SIFS);
+                                                    CoMP_Controller.information(i).endCoMPtransmission_time = t + event.pkt.nav + RTS_tx_time;
+                                                    TempEvent.pkt.endTxTime = CoMP_Controller.information(i).endCoMPtransmission_time;
+
+                                                    NewEvents = [TempEvent, NewEvents]; clear TempEvent;
+                                                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' is ready to send ' num2str(event.pkt.type) '.']); end
+                                                else %RTS_method ==2
+                                                    %Not done here.
+                                                end
+                                            elseif (strcmp(event.pkt.type, 'Data') == 1)
+                                                temp = CoMP_Controller.information(i).startorder;
+                                                for k=1:length(temp)
+                                                    CoMPAP_index = temp(k);
+                                                    % send DATA
+                                                    TempEvent = event;
+                                                    TempEvent.timer = t;
+                                                    TempEvent.type = 'send_PHY';
+                                                    TempEvent.STA_ID = CoMPAP_index;
+                                                    TempEvent.pkt = CoMP_Controller.information(CoMPAP_index).pkt;
+                                                    % Creat a new id for the data packet
+                                                    TempEvent.pkt.id = new_id(CoMPAP_index);
+                                                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+
+                                                    if detail_Debug, disp(['  -D: STA ' num2str(CoMPAP_index) ' is ready to send ' num2str(event.pkt.type) '.']); end
+                                                end
+                                            else
+                                                error 'error pkt.type, when backoff == 0 in CoMP mode';
+                                            end
+                                        else % STA_Info(i).CoMP_coordinator's readyRTS ~= 1
+                                            TempEvent = event;
+                                            TempEvent.type = 'MUNDP_response';
+                                            NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                                        end
+                                    else % CoMP_Controller.information(i).readyRTS ~= 1
                                         TempEvent.type = 'CBF_timeout';
                                         TempEvent.timer = t + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
                                             (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime)+eps;
                                         NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' is ready to send ' num2str(event.pkt.type) '.']); end
                                     end
-                                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' is ready to send ' num2str(event.pkt.type) '.']); end
                                 end
                             end
                         elseif (STA(i, 3) == 0 && event.pkt.CoMP == 0)
-                            if (sounding_skipevent_Debug == 1 && (strcmp(event.pkt.type, 'NDP_Ann') == 1))
+                            if (strcmp(event.pkt.type, 'NDP_Ann') == 1)
                                 TempEvent.type = 'CBF_timeout';
                                 TempEvent.timer = t + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
                                     (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime)+eps;
@@ -611,56 +649,75 @@ switch event.type
         i = event.STA_ID;
         if (event.pkt.CoMP == 0 && ~isempty(STA_Info(i).CoMP_coordinator))
             if (all(CoMP_Controller.informer_index(STA_Info(i).CoMP_coordinator)))
-                event.pkt = Init_CoMPpkt2(event.pkt, i, t);
                 error "Impossible";
             end
         end
         if event_Debug, disp(['[' num2str(t, '%1.20f') ']: backoff @ STA ' num2str(i)]); end
         backoff_counter(i) = backoff_counter(i) - 1;
         if (STA(i, 3) == 0 && event.pkt.MU == 1 && event.pkt.CoMP == 1 && CoMP_Controller.information(i).numInform ~= 0)
-            if (CoMP_Controller.information(i).reset == 1)
-                CoMP_Controller.information(i).numInform = 0;
-            elseif (strcmp(event.pkt.type, 'RTS') == 1)
-                backoff_counter(i) = 0;
-                CoMP_Controller.information(i).numInform = 0;
-                if (CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1)
-                    TempEvent = event;
-                    TempEvent.type = 'MUNDP_response';
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
-                else
-                    FirstCoMPAP = CoMP_Controller.information(i).startorder(1);
-                    TempEvent = event;
-                    TempEvent.type = 'send_PHY';
-                    TempEvent.timer = CoMP_Controller.information(FirstCoMPAP).sendRTS_time(i);
-                    TempEvent.pkt.nav = CoMP_Controller.information(FirstCoMPAP).nav(i);
-                    TempEvent.pkt.sendDataTime = CoMP_Controller.information(FirstCoMPAP).sendData_time;
-                    TempEvent.pkt.endTxTime = CoMP_Controller.information(FirstCoMPAP).endCoMPtransmission_time;
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' wait to send ' num2str(event.pkt.type) '.']); end
-                end
-            elseif (strcmp(event.pkt.type, 'Data') == 1)
-                backoff_counter(i) = 0;
-                CoMP_Controller.information(i).numInform = 0;
-                if (CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1)
-                    TempEvent = event;
-                    TempEvent.type = 'MUNDP_response';
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                end
-                if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
-            elseif (strcmp(event.pkt.type, 'NDP_Ann') == 1)
-                FirstAP = CoMP_Controller.information(i).startorder(1);
-                backoff_counter(i) = 0;
-                CoMP_Controller.information(i).numInform = 0;
-                if CoMP_Controller.information(FirstAP).readyRTS == 1
-                    if sounding_skipevent_Debug == 0
-                        TempEvent = event;
-                        TempEvent.timer = t;
-                        TempEvent.type = 'send_PHY';
-                        TempEvent.STA_ID = i;
-                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' start sounding because STA ' num2str(FirstAP) ' readyRTS == 1']); end
+            if scheme == 3
+                if (strcmp(event.pkt.type, 'RTS') == 1)
+                    backoff_counter(i) = 0;
+                    CoMP_Controller.information(i).numInform = 0;
+                    if (CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1)
+                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
                     else
+                        FirstCoMPAP = CoMP_Controller.information(i).startorder(1);
+                        TempEvent = event;
+                        TempEvent.type = 'send_PHY';
+                        TempEvent.timer = CoMP_Controller.information(FirstCoMPAP).sendRTS_time(i);
+                        TempEvent.pkt.nav = CoMP_Controller.information(FirstCoMPAP).nav(i);
+                        TempEvent.pkt.sendDataTime = CoMP_Controller.information(FirstCoMPAP).sendData_time;
+                        TempEvent.pkt.endTxTime = CoMP_Controller.information(FirstCoMPAP).endCoMPtransmission_time;
+                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' wait to send ' num2str(event.pkt.type) '.']); end
+                    end
+                elseif (strcmp(event.pkt.type, 'Data') == 1)
+                    backoff_counter(i) = 0;
+                    CoMP_Controller.information(i).numInform = 0;
+                    if (CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1)
+                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
+                    end
+                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
+                elseif (strcmp(event.pkt.type, 'NDP_Ann') == 1)
+                    backoff_counter(i) = 0;
+                    CoMP_Controller.information(i).numInform = 0;
+                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
+                end
+            else
+                if (strcmp(event.pkt.type, 'RTS') == 1)
+                    backoff_counter(i) = 0;
+                    CoMP_Controller.information(i).numInform = 0;
+                    if (CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1)
+                        TempEvent = event;
+                        TempEvent.type = 'MUNDP_response';
+                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
+                    else
+                        FirstCoMPAP = CoMP_Controller.information(i).startorder(1);
+                        TempEvent = event;
+                        TempEvent.type = 'send_PHY';
+                        TempEvent.timer = CoMP_Controller.information(FirstCoMPAP).sendRTS_time(i);
+                        TempEvent.pkt.nav = CoMP_Controller.information(FirstCoMPAP).nav(i);
+                        TempEvent.pkt.sendDataTime = CoMP_Controller.information(FirstCoMPAP).sendData_time;
+                        TempEvent.pkt.endTxTime = CoMP_Controller.information(FirstCoMPAP).endCoMPtransmission_time;
+                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' wait to send ' num2str(event.pkt.type) '.']); end
+                    end
+                elseif (strcmp(event.pkt.type, 'Data') == 1)
+                    backoff_counter(i) = 0;
+                    CoMP_Controller.information(i).numInform = 0;
+                    if (CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS ~= 1)
+                        TempEvent = event;
+                        TempEvent.type = 'MUNDP_response';
+                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                    end
+                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' cancel event ' num2str(event.pkt.type) '.']); end
+                elseif (strcmp(event.pkt.type, 'NDP_Ann') == 1)
+                    FirstAP = CoMP_Controller.information(i).startorder(1);
+                    backoff_counter(i) = 0;
+                    CoMP_Controller.information(i).numInform = 0;
+                    if CoMP_Controller.information(FirstAP).readyRTS == 1
                         TempEvent = event;
                         TempEvent.timer = t + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
                             (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime)+eps;
@@ -682,79 +739,147 @@ switch event.type
                     if (STA(i, 3) == 0 && event.pkt.MU == 1 && event.pkt.CoMP == 1)
                         if (CoMP_Controller.information(i).numInform == 0)
                             CoMP_Controller.information(i).startorder = [i, STA_Info(i).CoMP_coordinator];
-                            CoMP_Controller.information(i).reset = 0;
                             % The first CoMP AP access to channel then inform other CoMP APs through CoMP_Controller
                             temp = STA_Info(i).CoMP_coordinator;
                             for k=1:length(temp)
                                 CoMP_Controller.information(temp(k)).numInform = 2;
                                 CoMP_Controller.information(temp(k)).startorder = CoMP_Controller.information(i).startorder;
-                                CoMP_Controller.information(temp(k)).reset = 0;
                             end
-                            if CoMP_Controller.information(i).readyRTS == 1
-                                if all(CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS) == 1
-                                    if (strcmp(event.pkt.type, 'RTS') == 1)
-                                        if RTS_method == 1
-                                            all_pkt_nav = [];
-                                            for k=1:length(CoMP_Controller.information(i).startorder)
-                                                AP_index = CoMP_Controller.information(i).startorder(k);
-                                                all_pkt_nav = [all_pkt_nav, CoMP_Controller.information(AP_index).pkt.nav];
+                            if scheme == 3
+                                if CoMP_Controller.information(i).readyRTS == 1
+                                    if all(CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS) == 1
+                                        if (strcmp(event.pkt.type, 'RTS') == 1)
+                                            if RTS_method == 1
+                                                all_pkt_nav = [];
+                                                for k=1:length(CoMP_Controller.information(i).startorder)
+                                                    AP_index = CoMP_Controller.information(i).startorder(k);
+                                                    all_pkt_nav = [all_pkt_nav, CoMP_Controller.information(AP_index).pkt.nav];
+                                                end
+                                                event.pkt.nav = max(all_pkt_nav); %find out maximum pkt.nav
+                                                for k=1:length(STA_Info(i).CoMP_coordinator)
+                                                    CoMP_Controller.information(STA_Info(i).CoMP_coordinator(k)).numInform = 1;
+                                                    CoMP_Controller.information(STA_Info(i).CoMP_coordinator(k)).startorder = [i, STA_Info(i).CoMP_coordinator];
+                                                    CoMP_Controller.information(i).nav(STA_Info(i).CoMP_coordinator(k)) = event.pkt.nav - k * (SIFS + RTS_tx_time);
+                                                    CoMP_Controller.information(i).sendRTS_time(STA_Info(i).CoMP_coordinator(k)) = t + k * (RTS_tx_time + SIFS);
+                                                end
+                                                CoMP_Controller.information(i).sendData_time = t+(length(STA_Info(i).CoMP_coordinator)+1)*(RTS_tx_time+SIFS)+...
+                                                    length(event.pkt.rv)*(CTS_tx_time+SIFS);
+                                                CoMP_Controller.information(i).endCoMPtransmission_time = t + event.pkt.nav + RTS_tx_time;
+                                                TempEvent.pkt.endTxTime = CoMP_Controller.information(i).endCoMPtransmission_time;
+                                                
+                                                NewEvents = [TempEvent, NewEvents]; clear TempEvent;
+                                                if detail_Debug, disp(['  -D: STA ' num2str(i) ' is ready to send ' num2str(event.pkt.type) '.']); end
+                                            else %RTS_method ==2
+                                                %Not done here.
                                             end
-                                            event.pkt.nav = max(all_pkt_nav); %find out maximum pkt.nav
-                                            for k=1:length(STA_Info(i).CoMP_coordinator)
-                                                CoMP_Controller.information(STA_Info(i).CoMP_coordinator(k)).numInform = 1;
-                                                CoMP_Controller.information(STA_Info(i).CoMP_coordinator(k)).startorder = [i, STA_Info(i).CoMP_coordinator];
-                                                CoMP_Controller.information(i).nav(STA_Info(i).CoMP_coordinator(k)) = event.pkt.nav - k * (SIFS + RTS_tx_time);
-                                                CoMP_Controller.information(i).sendRTS_time(STA_Info(i).CoMP_coordinator(k)) = t + k * (RTS_tx_time + SIFS);
+                                        elseif (strcmp(event.pkt.type, 'Data') == 1)
+                                            temp = CoMP_Controller.information(i).startorder;
+                                            for k=1:length(temp)
+                                                CoMPAP_index = temp(k);
+                                                % send DATA
+                                                TempEvent = event;
+                                                TempEvent.timer = t;
+                                                TempEvent.type = 'send_PHY';
+                                                TempEvent.STA_ID = CoMPAP_index;
+                                                TempEvent.pkt = CoMP_Controller.information(CoMPAP_index).pkt;
+                                                % Creat a new id for the data packet
+                                                TempEvent.pkt.id = new_id(CoMPAP_index);
+                                                NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                                                
+                                                if detail_Debug, disp(['  -D: STA ' num2str(CoMPAP_index) ' is ready to send ' num2str(event.pkt.type) '.']); end
                                             end
-                                            CoMP_Controller.information(i).sendData_time = t+(length(STA_Info(i).CoMP_coordinator)+1)*(RTS_tx_time+SIFS)+...
-                                                length(event.pkt.rv)*(CTS_tx_time+SIFS);
-                                            CoMP_Controller.information(i).endCoMPtransmission_time = t + event.pkt.nav + RTS_tx_time;
-                                            TempEvent.pkt.endTxTime = CoMP_Controller.information(i).endCoMPtransmission_time;
-                                            
-                                            NewEvents = [TempEvent, NewEvents]; clear TempEvent;
-                                            if detail_Debug, disp(['  -D: STA ' num2str(i) ' is ready to send ' num2str(event.pkt.type) '.']); end
-                                        else %RTS_method ==2
-                                            %Not done here.
-                                        end
-                                    elseif (strcmp(event.pkt.type, 'Data') == 1)
-                                        temp = CoMP_Controller.information(i).startorder;
-                                        for k=1:length(temp)
-                                            CoMPAP_index = temp(k);
-                                            % send DATA
-                                            TempEvent = event;
-                                            TempEvent.timer = t;
-                                            TempEvent.type = 'send_PHY';
-                                            TempEvent.STA_ID = CoMPAP_index;
-                                            TempEvent.pkt = CoMP_Controller.information(CoMPAP_index).pkt;
-                                            % Creat a new id for the data packet
-                                            TempEvent.pkt.id = new_id(CoMPAP_index);
-                                            NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                                            
-                                            if detail_Debug, disp(['  -D: STA ' num2str(CoMPAP_index) ' is ready to send ' num2str(event.pkt.type) '.']); end
+                                        else
+                                            error 'error pkt.type, when backoff == 0 in CoMP mode';
                                         end
                                     else
-                                        error 'error pkt.type, when backoff == 0 in CoMP mode';
+                                        for k=1:length(CoMP_Controller.information(i).startorder)
+                                            CoMPAP_index = CoMP_Controller.information(i).startorder(k);
+                                            TempEvent = event;
+                                            TempEvent.type = 'CBF_timeout';
+                                            TempEvent.pkt = CoMP_Controller.information(CoMPAP_index).pkt;
+                                            TempEvent.timer = t + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
+                                                (length(TempEvent.pkt.CoMPAll)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime)+eps;
+                                            TempEvent.STA_ID = CoMPAP_index;
+                                            NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                                        end
+                                        if detail_Debug, disp(['  -D: STA ' num2str(i) ' send NDP_Ann.']); end
                                     end
                                 else
-                                    
-                                    TempEvent = event;
-                                    TempEvent.type = 'MUNDP_response';
-                                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                                    for k=1:length(CoMP_Controller.information(i).startorder)
+                                        CoMPAP_index = CoMP_Controller.information(i).startorder(k);
+                                        TempEvent = event;
+                                        TempEvent.type = 'CBF_timeout';
+                                        TempEvent.pkt = CoMP_Controller.information(CoMPAP_index).pkt;
+                                        TempEvent.timer = t + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
+                                            (length(TempEvent.pkt.CoMPAll)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime)+eps;
+                                        TempEvent.STA_ID = CoMPAP_index;
+                                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                                    end
+                                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' send ' num2str(event.pkt.type) '.']); end
                                 end
                             else
-                                if sounding_skipevent_Debug == 0
-                                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                                if CoMP_Controller.information(i).readyRTS == 1
+                                    if all(CoMP_Controller.information(STA_Info(i).CoMP_coordinator).readyRTS) == 1
+                                        if (strcmp(event.pkt.type, 'RTS') == 1)
+                                            if RTS_method == 1
+                                                all_pkt_nav = [];
+                                                for k=1:length(CoMP_Controller.information(i).startorder)
+                                                    AP_index = CoMP_Controller.information(i).startorder(k);
+                                                    all_pkt_nav = [all_pkt_nav, CoMP_Controller.information(AP_index).pkt.nav];
+                                                end
+                                                event.pkt.nav = max(all_pkt_nav); %find out maximum pkt.nav
+                                                for k=1:length(STA_Info(i).CoMP_coordinator)
+                                                    CoMP_Controller.information(STA_Info(i).CoMP_coordinator(k)).numInform = 1;
+                                                    CoMP_Controller.information(STA_Info(i).CoMP_coordinator(k)).startorder = [i, STA_Info(i).CoMP_coordinator];
+                                                    CoMP_Controller.information(i).nav(STA_Info(i).CoMP_coordinator(k)) = event.pkt.nav - k * (SIFS + RTS_tx_time);
+                                                    CoMP_Controller.information(i).sendRTS_time(STA_Info(i).CoMP_coordinator(k)) = t + k * (RTS_tx_time + SIFS);
+                                                end
+                                                CoMP_Controller.information(i).sendData_time = t+(length(STA_Info(i).CoMP_coordinator)+1)*(RTS_tx_time+SIFS)+...
+                                                    length(event.pkt.rv)*(CTS_tx_time+SIFS);
+                                                CoMP_Controller.information(i).endCoMPtransmission_time = t + event.pkt.nav + RTS_tx_time;
+                                                TempEvent.pkt.endTxTime = CoMP_Controller.information(i).endCoMPtransmission_time;
+
+                                                NewEvents = [TempEvent, NewEvents]; clear TempEvent;
+                                                if detail_Debug, disp(['  -D: STA ' num2str(i) ' is ready to send ' num2str(event.pkt.type) '.']); end
+                                            else %RTS_method ==2
+                                                %Not done here.
+                                            end
+                                        elseif (strcmp(event.pkt.type, 'Data') == 1)
+                                            temp = CoMP_Controller.information(i).startorder;
+                                            for k=1:length(temp)
+                                                CoMPAP_index = temp(k);
+                                                % send DATA
+                                                TempEvent = event;
+                                                TempEvent.timer = t;
+                                                TempEvent.type = 'send_PHY';
+                                                TempEvent.STA_ID = CoMPAP_index;
+                                                TempEvent.pkt = CoMP_Controller.information(CoMPAP_index).pkt;
+                                                % Creat a new id for the data packet
+                                                TempEvent.pkt.id = new_id(CoMPAP_index);
+                                                NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+
+                                                if detail_Debug, disp(['  -D: STA ' num2str(CoMPAP_index) ' is ready to send ' num2str(event.pkt.type) '.']); end
+                                            end
+                                        else
+                                            error 'error pkt.type, when backoff == 0 in CoMP mode';
+                                        end
+                                    else
+
+                                        TempEvent = event;
+                                        TempEvent.type = 'MUNDP_response';
+                                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                                    end
                                 else
                                     TempEvent.type = 'CBF_timeout';
                                     TempEvent.timer = t + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
                                         (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime)+eps;
                                     NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+                                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' is ready to send ' num2str(event.pkt.type) '.']); end
                                 end
-                                if detail_Debug, disp(['  -D: STA ' num2str(i) ' is ready to send ' num2str(event.pkt.type) '.']); end
                             end
                         end
                     elseif (STA(i, 3) == 0 && event.pkt.CoMP == 0)
-                        if (sounding_skipevent_Debug == 1 && (strcmp(event.pkt.type, 'NDP_Ann') == 1))
+                        if (strcmp(event.pkt.type, 'NDP_Ann') == 1)
                             TempEvent.type = 'CBF_timeout';
                             TempEvent.timer = t + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
                                 (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime)+eps;
@@ -795,10 +920,6 @@ switch event.type
     case 'send_PHY'
         t = event.timer;
         i = event.STA_ID;
-%         if (strcmp(event.pkt.type, 'CTS') == 1)
-%             event.pkt.rv = STA_Info(i).rxMU;
-%             STA_Info(i).rxMU = [];   %move from recv_MAC case:RTS
-%         end
         j = event.pkt.rv;
 
         if event_Debug, disp(['[' num2str(t, '%1.20f') ']: send_PHY @ STA ' num2str(i)]); end
@@ -809,14 +930,6 @@ switch event.type
         end
 
         switch event.pkt.type
-            case 'NDP_Ann'
-                txtime = NDPAnnTime;
-            case 'NDP'
-                txtime = NDPTime;
-            case 'Compressed_BF'
-                txtime = CompressedBeamformingTime;
-            case 'Report_P'
-                txtime = ReportPollTime;
             case 'RTS'
                 txtime = RTS_tx_time;
             case 'CTS'
@@ -912,38 +1025,6 @@ switch event.type
                     TempEvent.type = 'MUData_response';
                     TempEvent.STA_ID = i;
                     NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                    switch PHY_CH_module
-                        case 'old'
-                            % The multi-antenna AP send Data so calculate ZF precoding matrice for MU
-                            selection_length = length(event.pkt.rv);
-                            if (selection_length >= 1)
-                                H = zeros(selection_length*Num_Rx, Num_Tx);
-                                for k=1:selection_length
-                                    H((k-1)*Num_Rx+1:k*Num_Rx, :) = STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:);
-                                end
-                                W = H'/(H*H');
-                                if MIMO_Debug, disp('  -M: Channel H for precoder,'); disp(H); disp('  -M: Precoder H''/(H*H'') after calculating,'); disp(W); end
-                                temp = diag(W'*W).'; % diag output a colum vector, transpose it to row vector
-                                W = bsxfun(@rdivide, W, sqrt(temp)); % Normalize precoding matrix
-                                if MIMO_Debug, disp('  -M: Normalized precoder,'); disp(W); end
-                                for k=1:selection_length
-                                    if (MIMO_Debug && k == 1), disp(['  -M: Divide normalized precoder by sqrt(' num2str(selection_length) ') to equal power,']); end
-                                    STA_Info(i).Precoding_Matrix(:,(event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx) = W(:,(k-1)*Num_Rx+1:k*Num_Rx)/sqrt(selection_length);
-                                end
-                                if MIMO_Debug,
-                                    disp(W/sqrt(selection_length));
-                                    % Verify receives signal strength of each intended STA
-                                    for k=1:selection_length
-                                        temp_H = STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx, :);
-                                        disp(['  -M: STA ' num2str(event.pkt.rv(k)) ' should receive signal strength ' num2str(trace(temp_H*STA_Info(i).Precoding_Matrix*(temp_H*STA_Info(i).Precoding_Matrix)'))]);
-                                    end
-                                end
-                            else
-                                error(['send_PHY: STA ' num2str(i) ' it is impossible to transmit Data packet to NULL']);
-                            end
-                        case 'new'
-                            % Nothing need to do here.
-                    end
                 elseif (event.pkt.MU == 1 && event.pkt.CoMP == 1)
                     %disp([' STA power  at 1 1' num2str(STA(i,5))]);
                     STA_Info(i).rxMU = [];
@@ -958,118 +1039,6 @@ switch event.type
                         NewEvents = [NewEvents, TempEvent]; clear TempEvent;
                     end
                     if MIMO_Debug, disp(['  -M: CoMP transmission send Data to ' num2str(event.pkt.rv)]); end
-                    
-                    switch PHY_CH_module
-                        case 'old'
-                            selection_length = length(event.pkt.rv);
-                            if (selection_length == length(event.pkt.CoMPGroup) && CoMP_Controller.CoMP_tx_mode == 0) % Networked MIMO
-                                CoMPAPs_length = length(CoMP_Controller.information(i).startorder);
-                                H = zeros(selection_length*Num_Rx, CoMPAPs_length*Num_Tx);
-                                for k=1:selection_length
-                                    for l = 1:CoMPAPs_length
-                                        CoMPAP_index = CoMP_Controller.information(i).startorder(l);
-                                        temp_H = STA_Info(CoMPAP_index).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:);
-                                        if (temp_H == zeros(Num_Rx, Num_Tx))
-                                            temp_H = sqrt(LongTerm_recv_power(CoMPAP_index, event.pkt.rv(k), rmodel))*(randn(Num_Rx, Num_Tx)+1i*randn(Num_Rx, Num_Tx))/sqrt(2);
-                                            % No CSI but restore temp CSI into STA_Info(i).Channel_Matrx, but STA_Info(i).TS do not record
-                                            STA_Info(CoMPAP_index).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:) = temp_H;
-                                        end
-                                        H((k-1)*Num_Rx+1:k*Num_Rx, (l-1)*Num_Tx+1:l*Num_Tx) = temp_H;
-                                    end
-                                end
-                                W = H'/(H*H');
-                                if MIMO_Debug, disp('  -M: Channel H for precoder,'); disp(H); disp('  -M: Precoder H''/(H*H'') after calculating,'); disp(W); end
-                                temp = diag(W'*W).'; % diag output a colum vector, transpose it to row vector
-                                W = bsxfun(@rdivide, W, sqrt(temp)); % Normalize precoding matrix
-                                if MIMO_Debug, disp('  -M: Normalized precoder,'); disp(W); end
-                                for k=1:selection_length
-                                    for l=1:CoMPAPs_length
-                                        CoMPAP_index = CoMP_Controller.information(i).startorder(l);
-                                        if (MIMO_Debug && k == 1 && l == 1), disp(['  -M: Divide normalized precoder by sqrt(' num2str(length(STA_Info(CoMPAP_index).IntendSTA)) ') to equal power,']); end
-                                        STA_Info(CoMPAP_index).Precoding_Matrix(:,(event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx) = W((l-1)*Num_Tx+1:l*Num_Tx,(k-1)*Num_Rx+1:k*Num_Rx)/sqrt(length(STA_Info(CoMPAP_index).IntendSTA));
-                                    end
-                                end
-                                if MIMO_Debug,
-                                    for l=1:CoMPAPs_length
-                                        CoMPAP_index = CoMP_Controller.information(i).startorder(l);
-                                        disp(STA_Info(CoMPAP_index).Precoding_Matrix);
-                                    end
-                                    % Verify receives signal strength of each intended STA
-                                    for k=1:selection_length
-                                        rv_signal = [];
-                                        for l = 1:CoMPAPs_length
-                                            CoMPAP_index = CoMP_Controller.information(i).startorder(l);
-                                            temp_H = STA_Info(CoMPAP_index).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx, :);
-                                            if (l == 1)
-                                                rv_signal = temp_H*STA_Info(CoMPAP_index).Precoding_Matrix;
-                                            else
-                                                rv_signal = rv_signal + temp_H*STA_Info(CoMPAP_index).Precoding_Matrix;
-                                            end
-                                        end
-                                        disp(['  -M: STA ' num2str(event.pkt.rv(k)) ' should receive signal strength ' num2str(trace(rv_signal*rv_signal'))]);
-                                    end
-                                end
-                            elseif (selection_length == length(event.pkt.CoMPGroup) && CoMP_Controller.CoMP_tx_mode == 1) % Coordinated Scheduling/Coordinated Beamforming
-                                H = zeros(selection_length*Num_Rx, Num_Tx);
-                                for k=1:selection_length
-                                    temp_H = STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:);
-                                    if (temp_H == zeros(Num_Rx, Num_Tx))
-                                        temp_H = sqrt(recv_power(i, event.pkt.rv(k), rmodel))*(randn(Num_Rx, Num_Tx)+1i*randn(Num_Rx, Num_Tx))/sqrt(2);
-                                        % No CSI but restore temp CSI into STA_Info(i).Channel_Matrx, but STA_Info(i).TS do not record
-                                        STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:) = temp_H;
-                                    end
-                                    H((k-1)*Num_Rx+1:k*Num_Rx, :) = temp_H;
-                                end
-                                W = H'/(H*H');
-                                if MIMO_Debug, disp('  -M: Channel H for precoder,'); disp(H); disp('  -M: Precoder H''/(H*H'') after calculating,'); disp(W); end
-                                temp = diag(W'*W).'; % diag output a colum vector, transpose it to row vector
-                                W = bsxfun(@rdivide, W, sqrt(temp)); % Normalize precoding matrix
-                                if MIMO_Debug, disp('  -M: Normalized precoder,'); disp(W); end
-                                for k=1:selection_length
-                                    if (MIMO_Debug && k == 1), disp(['  -M: Divide normalized precoder by sqrt(' num2str(length(STA_Info(i).IntendSTA)) ') to equal power,']); end
-                                    if (any(event.pkt.rv(k) == STA_Info(i).IntendSTA))
-                                        STA_Info(i).Precoding_Matrix(:,(event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx) = W(:,(k-1)*Num_Rx+1:k*Num_Rx)/sqrt(length(STA_Info(i).IntendSTA));
-                                    end
-                                end
-                                if MIMO_Debug,
-                                    disp(STA_Info(i).Precoding_Matrix);
-                                    % Verify receives signal strength of each intended STA
-                                    for k=1:selection_length
-                                        temp_H = STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx, :);
-                                        disp(['  -M: STA ' num2str(event.pkt.rv(k)) ' should receive signal strength ' num2str(trace(temp_H*STA_Info(i).Precoding_Matrix*(temp_H*STA_Info(i).Precoding_Matrix)'))]);
-                                    end
-                                end
-                            else % Networked MIMO and CS/CB fail => DL MU-MIMO
-                                H = zeros(selection_length*Num_Rx, Num_Tx);
-                                for k=1:selection_length
-                                    temp_H = STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:);
-                                    if (temp_H == zeros(Num_Rx, Num_Tx))
-                                        temp_H = sqrt(recv_power(i, event.pkt.rv(k), rmodel))*(randn(Num_Rx, Num_Tx)+1i*randn(Num_Rx, Num_Tx))/sqrt(2);
-                                        % No CSI but restore temp CSI into STA_Info(i).Channel_Matrx, but STA_Info(i).TS do not record
-                                        STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx,:) = temp_H;
-                                    end
-                                    H((k-1)*Num_Rx+1:k*Num_Rx, :) = temp_H;
-                                end
-                                W = H'/(H*H');
-                                if MIMO_Debug, disp('  -M: Channel H for precoder,'); disp(H); disp('  -M: Precoder H''/(H*H'') after calculating,'); disp(W); end
-                                temp = diag(W'*W).'; % diag output a colum vector, transpose it to row vector
-                                W = bsxfun(@rdivide, W, sqrt(temp)); % Normalize precoding matrix
-                                for k=1:selection_length
-                                    if (MIMO_Debug && k == 1), disp(['  -M: Divide normalized precoder by sqrt(' num2str(selection_length) ') to equal power,']); end
-                                    STA_Info(i).Precoding_Matrix(:,(event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx) = W(:,(k-1)*Num_Rx+1:k*Num_Rx)/sqrt(selection_length);
-                                end
-                                if MIMO_Debug,
-                                    disp(STA_Info(i).Precoding_Matrix);
-                                    % Verify receives signal strength of each intended STA
-                                    for k=1:selection_length
-                                        temp_H = STA_Info(i).Channel_Matrix((event.pkt.rv(k)-1)*Num_Rx+1:event.pkt.rv(k)*Num_Rx, :);
-                                        disp(['  -M: STA ' num2str(event.pkt.rv(k)) ' should receive signal strength ' num2str(trace(temp_H*STA_Info(i).Precoding_Matrix*(temp_H*STA_Info(i).Precoding_Matrix)'))]);
-                                    end
-                                end
-                            end
-                        case 'new'
-                            % Nothing need to do here.
-                    end
                 end
                 if queue_Debug,
                     disp(['  -Q: @ action_CoMP.m: ']);
@@ -1088,12 +1057,7 @@ switch event.type
                     if (~isempty(pktsize_buf))
                         for k=1:length(j)
                             AP_index = STA(j(k), 3);
-                            switch PHY_CH_module
-                                case 'old'
-                                    aggr = pktsize_buf(k)/size_MAC_body;
-                                case 'new'
-                                    aggr = pktsize_buf(k)/(size_MAC_body*num_msdu);
-                            end
+                            aggr = pktsize_buf(k)/(size_MAC_body*num_msdu);
                             if (AP_index == i && aggr ~= 0)
                                 traffic_queue(i).list(find(traffic_queue(i).list == j(k), aggr)) = [];
                                 traffic_queue(i).size(STA_Info(i).associated_STA == j(k)) = traffic_queue(i).size(STA_Info(i).associated_STA == j(k)) - aggr;
@@ -1113,45 +1077,9 @@ switch event.type
                         disp(['  -Q: STA ' num2str(i) ' has queue_size(' num2str(i) ') = ' num2str(queue_size(i))]);
                     end
                 end
-            else % NDPAnn/NDP/Report/CBF/RTS/CTS/ACK packet
+            else % RTS/CTS/ACK packet
                 STA(i, 8) = 1; % Store transmitting pkt category: (0, 1, 2) = (None, NDPAnn/NDP/Report/CBF/RTS/CTS/ACK, Data)
-                if (strcmp(event.pkt.type, 'NDP_Ann') == 1)
-                    if (pending_id(i) > 0)
-%                         error(['send_PHY: STA ' num2str(i) ' there is already a pending packet, cannot send a new NDP_Ann packet']);
-                    end
-                    pending_id(i) = event.pkt.id;
-                    if detail_Debug, disp(['  -D: The pending_id(STA ' num2str(i) ') = ' num2str(pending_id(i)) '(NDP_Ann).']); end
-                    if (event.pkt.MU == 0 && event.pkt.CoMP == 0)
-                        STA_Info(i).rxMU = [];
-                        STA_Info(i).rxMU = zeros(1, length(event.pkt.rv));
-                    elseif (event.pkt.MU == 1 && event.pkt.CoMP == 0)
-                        STA_Info(i).rxMU = [];
-                        STA_Info(i).rxMU = zeros(1, length(event.pkt.rv));
-                    elseif (event.pkt.MU == 1 && event.pkt.CoMP == 1)
-                        STA_Info(i).rxMU = [];
-                        STA_Info(i).rxMU = zeros(1, length(event.pkt.rv));
-                    end
-                elseif (strcmp(event.pkt.type, 'NDP') == 1 || strcmp(event.pkt.type, 'Report_P') == 1)
-                    if (event.pkt.MU == 0 && event.pkt.CoMP == 0)
-                        TempEvent = event;
-                        TempEvent.timer = t + txtime + SIFS + CompressedBeamformingTime + eps;
-                        TempEvent.type = 'CBF_timeout';
-                        TempEvent.STA_ID = i;
-                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                    elseif (event.pkt.MU == 1 && event.pkt.CoMP == 0)
-                        TempEvent = event;
-                        TempEvent.timer = t + txtime + SIFS + CompressedBeamformingTime + eps;
-                        TempEvent.type = 'CBF_timeout';
-                        TempEvent.STA_ID = i;
-                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                    elseif (event.pkt.MU == 1 && event.pkt.CoMP == 1)
-                        TempEvent = event;
-                        TempEvent.timer = t + txtime + SIFS + CompressedBeamformingTime + eps;
-                        TempEvent.type = 'CBF_timeout';
-                        TempEvent.STA_ID = i;
-                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                    end
-                elseif (strcmp(event.pkt.type, 'RTS') == 1)
+                if (strcmp(event.pkt.type, 'RTS') == 1)
                     if (pending_id(i) > 0)
 %                         error(['send_PHY: STA ' num2str(i) ' there is already a pending packet, cannot send a new RTS packet']);
                     end
@@ -1232,7 +1160,7 @@ switch event.type
                 end
             end
             Intend(Intend == 0) = []; if detail_Debug, disp(['  -D: Intended receiver: STA [' num2str(Intend) ']']); end
-            if strcmp(event.pkt.type, 'Data') ~= 1
+            if (strcmp(event.pkt.type, 'Data') ~= 1 && strcmp(event.pkt.type, 'ACK') ~= 1)
                 % II.2: Setup receivers of not matching RA
                 NotIntend = zeros(1, Num_AP+Num_User);
                 %disp([' STA power ' num2str(STA(i,5)) 'event.pkt.MU ' num2str(event.pkt.MU) 'event.pkt.CoMP' num2str(event.pkt.CoMP) ' pkt type ' num2str(event.pkt.type)]);
@@ -1277,10 +1205,7 @@ switch event.type
                         % E.g., send_PHY: pkt(i -> j)
                         % RTS(AP1 -> STA2, STA6)/RTS(AP5 -> STA2, STA6)/CTS(STA2 -> AP1, AP5)/CTS(STA6 -> AP1, AP5)/ Data(AP1 -> STA2, STA6) and Data(AP5 -> STA2, STA6)/ ACK(STA2 -> AP1)/ACK(STA6 -> AP5)
                         if (any(sel_STA == event.pkt.CoMPGroup))
-                            %if (STA(sel_STA, 7) == 1)
-                                % MU receive RTS from AP correctly would ignore inter-user's CTS or ACK
                                 continue;
-                            %end
                         end
                         if (strcmp(event.pkt.type, 'CTS') == 1)
                             if (ismember(STA(sel_STA, 3),STA_Info(STA(i, 3)).CoMP_coordinator))
@@ -1351,27 +1276,7 @@ switch event.type
                 TempEvent.pkt = [];
                 NewEvents = [NewEvents, TempEvent]; clear TempEvent;
             elseif (event.pkt.MU == 1 && event.pkt.CoMP == 1)
-                if (strcmp(event.pkt.type, 'Report_P') == 1 || strcmp(event.pkt.type, 'NDP') == 1 || strcmp(event.pkt.type, 'NDP_Ann') == 1)
-                    temp = CoMP_Controller.information(i).startorder;
-                    if detail_Debug, disp(['  -D: STA ' num2str(temp) ' sounding fail, so reset and back to send_MAC.']); end
-                    for k=1:length(temp)
-                        TempEvent = event;
-                        TempEvent.timer = t;
-                        TempEvent.type = 'send_MAC';
-                        TempEvent.STA_ID = temp(k);
-                        TempEvent.pkt = [];
-                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                        if (CoMP_Controller.information(temp(k)).numInform == 1)
-                            CoMP_Controller.information(temp(k)).numInform = 0;
-                        end
-                        CoMP_Controller.information(temp(k)).reset = 1;
-                        CoMP_Controller.information(temp(k)).startorder = [];
-                        CoMP_Controller.informer_index(temp(k)) = 0;
-                        backoff_counter(temp(k)) = 0;
-                        STA_Info(temp(k)).rxMU = [];
-                    end
-                        
-                elseif (strcmp(event.pkt.type, 'RTS') == 1)
+                if (strcmp(event.pkt.type, 'RTS') == 1)
                     TempEvent = event;
                     TempEvent.timer = t;
                     TempEvent.type = 'MURTS_response';
@@ -1430,215 +1335,84 @@ switch event.type
 %                 end
                 STA_Info(i).Precoding_Matrix(STA_Info(i).Precoding_Matrix ~= 0) = 0;
             end
-        elseif strcmp(event.pkt.type, 'NDP_Ann')
-            TempEvent = event;
-            TempEvent.type = 'send_PHY';
-            STA_Info(i).soundingqueue = event.pkt.rv;
-            TempEvent.timer = t + SIFS - eps;
-            TempEvent.pkt.nav = 0;
-            TempEvent.pkt.rv = STA_Info(i).soundingqueue(1);
-            TempEvent.pkt.type = 'NDP';
-            NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-            STA_Info(i).nextsounding = STA_Info(i).soundingqueue(1);
-            STA_Info(i).report_ptimes = 0;
         end
     case 'CBF_timeout'
         t = event.timer;
         i = event.STA_ID;
         if (event.pkt.MU == 0 && event.pkt.CoMP == 0)
-            if (isempty(STA_Info(i).soundingqueue))
-                if MCSAlgo == 0
-                    MCS_index = MCS * ones(1, length(event.pkt.Group));
-                else
-                    [MCS_index,~] = fc_return_MCS_Int(basic_rate,t,per_order,i,event.pkt.Group, Num_Tx,spatial_stream,freq,...
-                        Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-                        tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI,'MAC_body');
-                end
-                if sounding_skipevent_Debug == 1
-                    STA_Info(i).CSI_TS(event.pkt.Group - Num_AP) = t - eps;
-                end
-                STA_Info(i).MCS_record(event.pkt.Group - Num_AP) = MCS_index;
-                TempEvent = event;
-                TempEvent.timer = t;
-                TempEvent.type = 'send_MAC';
-                TempEvent.STA_ID = i;
-                TempEvent.pkt = [];
-                NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+            if MCSAlgo == 0
+                MCS_index = MCS * ones(1, length(event.pkt.Group));
             else
-                if (STA_Info(i).nextsounding == STA_Info(i).soundingqueue(1))
-                    STA_Info(i).report_ptimes = STA_Info(i).report_ptimes + 1;
-                else
-                    STA_Info(i).nextsounding = STA_Info(i).soundingqueue(1);
-                    STA_Info(i).report_ptimes = 1;
-                end
-
-                if STA_Info(i).report_ptimes > Max_Report_P
-                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' fail to get CBF than ' num2str(Max_Report_P) ' times to STA '  num2str(STA_Info(i).nextsounding) '.']); end
-                    TempEvent = event;
-                    TempEvent.timer = t + length(STA_Info(i).soundingqueue)*(ReportPollTime + SIFS + CompressedBeamformingTime) - ReportPollTime - eps;
-                    TempEvent.type = 'send_MAC';
-                    TempEvent.STA_ID = i;
-                    TempEvent.pkt = [];
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                    STA_Info(i).rxMU = [];
-                    STA_Info(i).soundingqueue = [];
-                elseif ~isempty(STA_Info(i).soundingqueue)
-                    TempEvent = event;
-                    TempEvent.type = 'send_PHY';
-                    TempEvent.timer = t + SIFS - eps;
-                    TempEvent.pkt.nav = SIFS + CompressedBeamformingTime;
-                    TempEvent.pkt.type = 'Report_P';
-                    TempEvent.pkt.rv = STA_Info(i).soundingqueue(1);
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                else
-                    error 'What is the case in CBF_timeout?';
-                end
+                [MCS_index,~] = fc_return_MCS_Int(basic_rate,t,per_order,i,event.pkt.Group, Num_Tx,spatial_stream,freq,...
+                    Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
+                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI,'MAC_body');
             end
+            STA_Info(i).CSI_TS(event.pkt.Group - Num_AP) = t - eps;
+            STA_Info(i).MCS_record(event.pkt.Group - Num_AP) = MCS_index;
+            TempEvent = event;
+            TempEvent.timer = t;
+            TempEvent.type = 'send_MAC';
+            TempEvent.STA_ID = i;
+            TempEvent.pkt = [];
+            NewEvents = [NewEvents, TempEvent]; clear TempEvent;
 
         elseif (event.pkt.MU == 1 && event.pkt.CoMP == 0)
-            
-            if (isempty(STA_Info(i).soundingqueue))
-                if MCSAlgo == 0
-                    MCS_index = MCS * ones(1, length(event.pkt.Group));
-                else
-                    [MCS_index,~] = fc_return_MCS_Int(basic_rate,t,per_order,i,event.pkt.Group, Num_Tx,spatial_stream,freq,...
-                        Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-                        tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI,'MAC_body');
-                end
-                if sounding_skipevent_Debug == 1
-                    for k=1:length(event.pkt.Group)
-                        sum_STA = length(event.pkt.Group);
-                        select_STA = event.pkt.Group(k);
-                        STA_Info(i).CSI_TS(select_STA - Num_AP) = t-(sum_STA-k)*(SIFS+ReportPollTime+SIFS+CompressedBeamformingTime)-eps;
-                    end
-                end
-                STA_Info(i).MCS_record(event.pkt.Group - Num_AP) = MCS_index;
-                TempEvent = event;
-                TempEvent.timer = t;
-                TempEvent.type = 'send_MAC';
-                TempEvent.STA_ID = i;
-                TempEvent.pkt = [];
-                NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+            if MCSAlgo == 0
+                MCS_index = MCS * ones(1, length(event.pkt.Group));
             else
-                if (STA_Info(i).nextsounding == STA_Info(i).soundingqueue(1))
-                    STA_Info(i).report_ptimes = STA_Info(i).report_ptimes + 1;
-                else
-                    STA_Info(i).nextsounding = STA_Info(i).soundingqueue(1);
-                    STA_Info(i).report_ptimes = 1;
-                end
-
-                if STA_Info(i).report_ptimes > Max_Report_P
-                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' fail to get CBF than ' num2str(Max_Report_P) ' times to STA '  num2str(STA_Info(i).nextsounding) '.']); end
-                    TempEvent = event;
-                    TempEvent.timer = t + length(STA_Info(i).soundingqueue)*(ReportPollTime + SIFS + CompressedBeamformingTime) - ReportPollTime - eps;
-                    TempEvent.type = 'send_MAC';
-                    TempEvent.STA_ID = i;
-                    TempEvent.pkt = [];
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                    STA_Info(i).rxMU = [];
-                    STA_Info(i).soundingqueue = [];
-                elseif ~isempty(STA_Info(i).soundingqueue)
-                    TempEvent = event;
-                    TempEvent.type = 'send_PHY';
-                    TempEvent.timer = t + SIFS - eps;
-                    TempEvent.pkt.nav = SIFS + CompressedBeamformingTime;
-                    TempEvent.pkt.type = 'Report_P';
-                    TempEvent.pkt.rv = STA_Info(i).soundingqueue(1);
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                else
-                    error 'What is the case in CBF_timeout?';
-                end
+                [MCS_index,~] = fc_return_MCS_Int(basic_rate,t,per_order,i,event.pkt.Group, Num_Tx,spatial_stream,freq,...
+                    Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
+                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI,'MAC_body');
             end
+            for k=1:length(event.pkt.Group)
+                sum_STA = length(event.pkt.Group);
+                select_STA = event.pkt.Group(k);
+                STA_Info(i).CSI_TS(select_STA - Num_AP) = t-(sum_STA-k)*(SIFS+ReportPollTime+SIFS+CompressedBeamformingTime)-eps;
+            end
+            STA_Info(i).MCS_record(event.pkt.Group - Num_AP) = MCS_index;
+            TempEvent = event;
+            TempEvent.timer = t;
+            TempEvent.type = 'send_MAC';
+            TempEvent.STA_ID = i;
+            TempEvent.pkt = [];
+            NewEvents = [NewEvents, TempEvent]; clear TempEvent;
             
         elseif (event.pkt.MU == 1 && event.pkt.CoMP == 1)
-            while (~isempty(STA_Info(i).soundingqueue))
-                if (any(STA_Info(i).soundingqueue(1) == STA_Info(i).cover_STA))
-                    break;
-                else
-                    STA_Info(i).soundingqueue(1) = [];
-                end
+            if MCSAlgo == 0
+                MCS_index = MCS * ones(1, length(event.pkt.CoMPGroup));
+            else
+                [MCS_index,~] = fc_return_MCS_Int(basic_rate,t,per_order,i,event.pkt.CoMPGroup, Num_Tx,spatial_stream,freq,...
+                    Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
+                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI,'MAC_body');
             end
-            if (isempty(STA_Info(i).soundingqueue))
-                if MCSAlgo == 0
-                    MCS_index = MCS * ones(1, length(event.pkt.CoMPGroup));
-                else
-                    [MCS_index,~] = fc_return_MCS_Int(basic_rate,t,per_order,i,event.pkt.CoMPGroup, Num_Tx,spatial_stream,freq,...
-                        Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-                        tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI,'MAC_body');
-                end
-                if sounding_skipevent_Debug == 1
-                    for k=1:length(event.pkt.CoMPGroup)
-                        sum_STA = length(event.pkt.CoMPGroup);
-                        select_STA = event.pkt.CoMPGroup(k);
-                        STA_Info(i).CSI_TS(select_STA - Num_AP) = t-(sum_STA-k)*(SIFS+ReportPollTime+SIFS+CompressedBeamformingTime)-eps;
-                    end
-                end
-                STA_Info(i).MCS_record(event.pkt.CoMPGroup - Num_AP) = MCS_index;
-                TempEvent = event;
-                TempEvent.timer = t + eps;
-                TempEvent.type = 'MUNDP_response';
-                NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+            for k=1:length(event.pkt.CoMPGroup)
+                sum_STA = length(event.pkt.CoMPGroup);
+                select_STA = event.pkt.CoMPGroup(k);
+                STA_Info(i).CSI_TS(select_STA - Num_AP) = t-(sum_STA-k)*(SIFS+ReportPollTime+SIFS+CompressedBeamformingTime)-eps;
+            end
+            STA_Info(i).MCS_record(event.pkt.CoMPGroup - Num_AP) = MCS_index;
+            TempEvent = event;
+            TempEvent.timer = t + eps;
+            TempEvent.type = 'MUNDP_response';
+            NewEvents = [NewEvents, TempEvent]; clear TempEvent;
+            if scheme == 3
+                % Nothing to do here
+            else
                 NextAP = i;
                 while (CoMP_Controller.information(NextAP).startorder(end) ~= NextAP )
                     NextAP = CoMP_Controller.information(NextAP).startorder(find(NextAP == CoMP_Controller.information(NextAP).startorder)+1);
                     if(CoMP_Controller.information(NextAP).readyRTS ~= 1)
-                        if sounding_skipevent_Debug == 0
-                            TempEvent = event;
-                            TempEvent.type = 'send_PHY';
-                            TempEvent.STA_ID = NextAP;
-                            TempEvent.timer = t + SIFS - eps;
-                            TempEvent.pkt = CoMP_Controller.information(NextAP).pkt;
-                            NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                            break;
-                        else
-                            TempEvent = event;
-                            TempEvent.type = 'CBF_timeout';
-                            TempEvent.STA_ID = NextAP;
-                            TempEvent.timer = t + SIFS + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
-                                            (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime);
-                            TempEvent.pkt = CoMP_Controller.information(NextAP).pkt;
-                            NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                            break;
-                        end
-                    end
-                end
-            else
-                if (STA_Info(i).nextsounding == STA_Info(i).soundingqueue(1))
-                    STA_Info(i).report_ptimes = STA_Info(i).report_ptimes + 1;
-                else
-                    STA_Info(i).nextsounding = STA_Info(i).soundingqueue(1);
-                    STA_Info(i).report_ptimes = 1;
-                end
-                if STA_Info(i).report_ptimes > Max_Report_P
-                    if detail_Debug, disp(['  -D: STA ' num2str(i) ' fail to get CBF than ' num2str(Max_Report_P) ' times to STA '  num2str(STA_Info(i).nextsounding) '.']); end
-                    temp = CoMP_Controller.information(i).startorder;
-                    for k=1:length(temp)
                         TempEvent = event;
-                        TempEvent.timer = t + length(STA_Info(i).soundingqueue)*(ReportPollTime + SIFS + CompressedBeamformingTime) - ReportPollTime - eps;
-                        TempEvent.type = 'send_MAC';
-                        TempEvent.STA_ID = temp(k);
-                        TempEvent.pkt = [];
+                        TempEvent.type = 'CBF_timeout';
+                        TempEvent.STA_ID = NextAP;
+                        TempEvent.timer = t + SIFS + NDPAnnTime + SIFS + NDPTime + SIFS + CompressedBeamformingTime +...
+                            (length(TempEvent.pkt.rv)-1)*(SIFS + ReportPollTime + SIFS + CompressedBeamformingTime);
+                        TempEvent.pkt = CoMP_Controller.information(NextAP).pkt;
                         NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                        STA_Info(temp(k)).rxMU = [];
-                        CoMP_Controller.information(temp(k)).numInform = 0;
-                        CoMP_Controller.information(temp(k)).startorder = [];
-                        CoMP_Controller.information(temp(k)).readyRTS = 0;
+                        break;
                     end
-                    STA_Info(i).soundingqueue = [];
-                elseif ~isempty(STA_Info(i).soundingqueue)
-                    TempEvent = event;
-                    TempEvent.type = 'send_PHY';
-                    TempEvent.timer = t + SIFS - eps;
-                    TempEvent.pkt.nav = length(STA_Info(i).soundingqueue)*(ReportPollTime + SIFS + CompressedBeamformingTime) - ReportPollTime;
-                    TempEvent.pkt.type = 'Report_P';
-                    TempEvent.pkt.rv = STA_Info(i).soundingqueue(1);
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                else
-                    error 'What is the case in CBF_timeout?';
                 end
             end
-            
-            
         end
     
     case 'MUNDP_response'
@@ -1646,7 +1420,7 @@ switch event.type
         i = event.STA_ID;
         if detail_Debug, disp(['  -D: STA ' num2str(i) ' is in MUNDP_response with ' num2str(event.pkt.type) ' and it readyRTS = ' num2str(CoMP_Controller.information(i).readyRTS) '.']); end
         
-        if (event.pkt.MU == 1 && event.pkt.CoMP == 1 && CoMP_Controller.information(i).reset ~= 1)
+        if (event.pkt.MU == 1 && event.pkt.CoMP == 1)
             CoMP_Controller.information(i).numInform = 1;
             pending_id(i) = 0;
             if (CoMP_Controller.information(i).numInform == 1 && all(CoMP_Controller.information(STA_Info(i).CoMP_coordinator).numInform == 1))
@@ -1942,112 +1716,56 @@ switch event.type
             % This has already been checked when sending but nav may be changed during transmission, so double check
             if detail_Debug, disp(['  -D: STA '  num2str(j) ' has packet virtual collision.']); end
         else
-            switch PHY_CH_module
-                case 'old'
-                    [pr0, pr, snr] = recv_phy(i, j, rmodel);
-                    if (strcmp(event.pkt.type, 'Data') == 1)
-                        if (event.pkt.MU == 0 && event.pkt.CoMP == 0)
-                            Prob = PER(event.pkt.MCS_index, event.pkt.size, snr);
-                            %Prob = 0;
-                        elseif (event.pkt.MU == 1 && event.pkt.CoMP == 0)
-                            if (isempty(event.pkt.MCS_index(j==event.pkt.Group)))
-                                Prob = 1;
-                            else
-                                Prob = PER(event.pkt.MCS_index(j==event.pkt.Group), event.pkt.size(j==event.pkt.Group), snr);
-                                %Prob = 0;
-                            end
-                        elseif (event.pkt.MU == 1 && event.pkt.CoMP == 1)
-                            if (isempty(event.pkt.MCS_index(j==event.pkt.CoMPGroup)))
-                                Prob = 1;
-                            else
-                                %    Prob = 0;
-                                Prob = PER(event.pkt.MCS_index(j==event.pkt.CoMPGroup), event.pkt.size(j==event.pkt.CoMPGroup), snr);
-                                %dBB = db(snr, 'power');disp(['STA ' num2str(j) ' receives ' num2str(snr) '(' num2str(dBB) ') => PER = ' num2str(Prob) ' select MCS' num2str(event.pkt.MCS_index(j==event.pkt.Group)) '.']);
-                            end
-                        end
-                    elseif (control_frame_Debug == 1)
-                        Prob = 0;
-                    elseif (strcmp(event.pkt.type, 'NDP_Ann') == 1)
-                        Prob = PER(MCS_ctrl, size_NDP_Ann, snr);
-                    elseif (strcmp(event.pkt.type, 'NDP') == 1)
-                        Prob = 0;
-                    elseif (strcmp(event.pkt.type, 'Compressed_BF') == 1)
-                        Prob = PER(MCS_ctrl, size_CVBFReport, snr);
-                    elseif (strcmp(event.pkt.type, 'Report_P') == 1)
-                        Prob = PER(MCS_ctrl, size_ReportPoll, snr);
-                    elseif (strcmp(event.pkt.type, 'ACK') == 1)
-                        Prob = PER(MCS_ctrl, size_BA, snr);
-                    elseif (strcmp(event.pkt.type, 'RTS') == 1)
-                        Prob = PER(MCS_ctrl, size_RTS, snr);
-                    elseif (strcmp(event.pkt.type, 'CTS') == 1)
-                        Prob = PER(MCS_ctrl, size_CTS, snr);
+            if (strcmp(event.pkt.type, 'Data') == 1)
+                if data_frame_Debug == 1
+                    Prob = 0;
+                    pr = 0;
+                    snr = 25;
+                elseif (event.pkt.MU == 0 && event.pkt.CoMP == 0)
+                    [pr,snr, Prob] = fc_recv_phy(event.pkt.rate,t,1,event.pkt.MCS_index, i,j, spatial_stream,spatial_stream,freq,...
+                        Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
+                        tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,event.pkt.size,AI,event.pkt.type);
+                    %Prob = 0;
+                elseif (event.pkt.MU == 1 && event.pkt.CoMP == 0)
+                    if (isempty(event.pkt.MCS_index(j==event.pkt.Group)))
+                        Prob = 1;
+                        pr = 1;
+                    else
+                        [pr,snr, Prob] = fc_recv_phy(event.pkt.rate(j==event.pkt.Group),t,find(j==event.pkt.Group),event.pkt.MCS_index(j==event.pkt.Group),i,j,length(event.pkt.Group)*spatial_stream,spatial_stream,freq,...
+                            Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
+                            tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,event.pkt.size(j==event.pkt.Group),AI,event.pkt.type);
+                        %Prob = 0;
                     end
-                case 'new'
-                    if (strcmp(event.pkt.type, 'Data') == 1)
-                        if data_frame_Debug == 1
-                            Prob = 0;
-                            pr = 0;
-                            snr = 25;
-                        elseif (event.pkt.MU == 0 && event.pkt.CoMP == 0)
-                            [pr,snr, Prob] = fc_recv_phy(event.pkt.rate,t,1,event.pkt.MCS_index, i,j, spatial_stream,spatial_stream,freq,...
-                                                    Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-                                                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,event.pkt.size,AI,event.pkt.type);
-                            %Prob = 0;
-                        elseif (event.pkt.MU == 1 && event.pkt.CoMP == 0)
-                            if (isempty(event.pkt.MCS_index(j==event.pkt.Group)))
-                                Prob = 1;
-                                pr = 1;
-                            else
-                                [pr,snr, Prob] = fc_recv_phy(event.pkt.rate(j==event.pkt.Group),t,find(j==event.pkt.Group),event.pkt.MCS_index(j==event.pkt.Group),i,j,length(event.pkt.Group)*spatial_stream,spatial_stream,freq,...
-                                                    Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-                                                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,event.pkt.size(j==event.pkt.Group),AI,event.pkt.type);
-                                %Prob = 0;
-                            end
-                        elseif (event.pkt.MU == 1 && event.pkt.CoMP == 1)
-                            if (isempty(event.pkt.MCS_index(j==event.pkt.CoMPGroup)))
-                                Prob = 1;
-                                pr = 1;
-                            else
-                                [pr,snr, Prob] = fc_recv_phy(event.pkt.rate(j==event.pkt.CoMPGroup),t,find(j==event.pkt.CoMPGroup),event.pkt.MCS_index(j==event.pkt.CoMPGroup),i(i==STA(j,3)),j,length(event.pkt.CoMPGroup)*spatial_stream,spatial_stream,freq,...
-                                                    Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-                                                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,event.pkt.size(j==event.pkt.CoMPGroup),AI,event.pkt.type);
-%                                     Prob = 0;
-%                                     pr = 0;
-                                %dBB = db(snr, 'power');disp(['STA ' num2str(j) ' receives ' num2str(snr) '(' num2str(dBB) ') => PER = ' num2str(Prob) ' select MCS' num2str(event.pkt.MCS_index(j==event.pkt.Group)) '.']);
-                            end
-                        end
-                    elseif (control_frame_Debug == 1)
-                        pr = 0;
-                        Prob = 0;
-                    elseif (strcmp(event.pkt.type, 'NDP_Ann') == 1)
-                        [pr,snr, Prob] = fc_recv_phy(basic_rate,t,1,MCS_ctrl, i,j, 1,1,freq,...
-                                                    Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-                                                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_NDP_Ann,AI,event.pkt.type);
-                    elseif (strcmp(event.pkt.type, 'NDP') == 1)
-                        pr = 0;
-                        Prob = 0;
-                    elseif (strcmp(event.pkt.type, 'Compressed_BF') == 1)
-                        [pr,snr, Prob] = fc_recv_phy(basic_rate,t,1,MCS_ctrl, i,j, 1,1,freq,...
-                                                    Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-                                                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_CVBFReport,AI,event.pkt.type);
-                    elseif (strcmp(event.pkt.type, 'Report_P') == 1)
-                        [pr,snr, Prob] = fc_recv_phy(basic_rate,t,1,MCS_ctrl, i,j, 1,1,freq,...
-                                                    Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-                                                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_ReportPoll,AI,event.pkt.type);
-                    elseif (strcmp(event.pkt.type, 'ACK') == 1)
-                        [pr,snr, Prob] = fc_recv_phy(basic_rate,t,1,MCS_ctrl, i,j, 1,1,freq,...
-                                                    Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-                                                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_BA,AI,event.pkt.type);
-                    elseif (strcmp(event.pkt.type, 'RTS') == 1)
-                        [pr,snr, Prob] = fc_recv_phy(basic_rate,t,1,MCS_ctrl, i,j, 1,1,freq,...
-                                                    Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-                                                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_RTS,AI,event.pkt.type);
-                    elseif (strcmp(event.pkt.type, 'CTS') == 1)
-                        [pr,snr, Prob] = fc_recv_phy(basic_rate,t,1,MCS_ctrl, i,j, 1,1,freq,...
-                                                    Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-                                                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_CTS,AI,event.pkt.type);
+                elseif (event.pkt.MU == 1 && event.pkt.CoMP == 1)
+                    if (isempty(event.pkt.MCS_index(j==event.pkt.CoMPGroup)))
+                        Prob = 1;
+                        pr = 1;
+                    else
+                        [pr,snr, Prob] = fc_recv_phy(event.pkt.rate(j==event.pkt.CoMPGroup),t,find(j==event.pkt.CoMPGroup),event.pkt.MCS_index(j==event.pkt.CoMPGroup),i(i==STA(j,3)),j,length(event.pkt.CoMPGroup)*spatial_stream,spatial_stream,freq,...
+                            Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
+                            tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,event.pkt.size(j==event.pkt.CoMPGroup),AI,event.pkt.type);
+                        %                                     Prob = 0;
+                        %                                     pr = 0;
+                        %dBB = db(snr, 'power');disp(['STA ' num2str(j) ' receives ' num2str(snr) '(' num2str(dBB) ') => PER = ' num2str(Prob) ' select MCS' num2str(event.pkt.MCS_index(j==event.pkt.Group)) '.']);
                     end
+                end
+            elseif (control_frame_Debug == 1)
+                pr = 0;
+                Prob = 0;
+            elseif (strcmp(event.pkt.type, 'ACK') == 1)
+                [pr,snr, Prob] = fc_recv_phy(basic_rate,t,1,MCS_ctrl, i,j, 1,1,freq,...
+                    Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
+                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_BA,AI,event.pkt.type);
+            elseif (strcmp(event.pkt.type, 'RTS') == 1)
+                [pr,snr, Prob] = fc_recv_phy(basic_rate,t,1,MCS_ctrl, i,j, 1,1,freq,...
+                    Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
+                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_RTS,AI,event.pkt.type);
+            elseif (strcmp(event.pkt.type, 'CTS') == 1)
+                [pr,snr, Prob] = fc_recv_phy(basic_rate,t,1,MCS_ctrl, i,j, 1,1,freq,...
+                    Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
+                    tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_CTS,AI,event.pkt.type);
             end
+            
 
             if (rand(1) < Prob) % Error packet
                 if detail_Debug, disp(['  -D: STA ' num2str(j) ' cannot hear ' num2str(event.pkt.type) ' from STA ' num2str(i) '.']); end
@@ -2109,88 +1827,18 @@ switch event.type
                 if (any(j == event.pkt.rv))
                     % The STA receives CTS also CSI, so generate channel matrix
                     if (event.pkt.MU == 0 && event.pkt.CoMP == 0)
-                        if (strcmp(event.pkt.type, 'Data') == 1)
-                             switch PHY_CH_module
-                                    case 'old'
-                                        STA_Info(i).SNR_record(j) = snr;
-                                 case 'new'
-                             end
-                        end
-                        if (strcmp(event.pkt.type,'Compressed_BF') == 1)
-                            if (STA(j, 3) == 0) % A STA i sends CTS to the AP j and the AP j receives correctly
-                                switch PHY_CH_module
-                                    case 'old'
-                                        STA_Info(j).Channel_Matrix((i-1)*Num_Rx+1:i*Num_Rx, :) = sqrt(recv_power(i, j, rmodel))*(randn(Num_Rx, Num_Tx)+1i*randn(Num_Rx, Num_Tx))/sqrt(2);
-                                    case 'new'
-%                                         [MCS_index,~] = fc_return_MCS(per_order,j,i, Num_Tx,spatial_stream,freq,...
-%                                                      Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-%                                                      tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI);
-%                                         MCS_index = 1;
-%                                         STA_Info(j).MCS_record(i-Num_AP) = MCS_index;
-                                        
-                                end
-                                STA_Info(j).CSI_TS(i-Num_AP) = t;
-                                if MIMO_Debug, disp(['  -M: Channel Matrix(CSI), H' num2str(i) num2str(j) ' = ']); disp(STA_Info(j).Channel_Matrix((i-1)*Num_Rx+1:i*Num_Rx, :)); end
-                            end
-                        end
                         TempEvent = event;
                         TempEvent.timer = t;
                         TempEvent.type = 'recv_MAC';
                         TempEvent.STA_ID = j;
                         NewEvents = [NewEvents, TempEvent]; clear TempEvent;
                     elseif (event.pkt.MU == 1 && event.pkt.CoMP == 0)
-                        if (strcmp(event.pkt.type,'Compressed_BF') == 1)
-                            if (STA(j, 3) == 0) % A STA i sends CTS to the AP j and the AP j receives correctly
-                                switch PHY_CH_module
-                                    case 'old'
-                                        STA_Info(j).Channel_Matrix((i-1)*Num_Rx+1:i*Num_Rx, :) = sqrt(recv_power(i, j, rmodel))*(randn(Num_Rx, Num_Tx)+1i*randn(Num_Rx, Num_Tx))/sqrt(2);
-                                    case 'new'
-%                                         if ((t - STA_Info(j).CSI_TS(i-Num_AP)) < soundingperiod && skip_cal_MCS_sp_Debug)
-%                                             MCS_index = STA_Info(j).MCS_record(i - Num_AP);
-%                                         else
-%                                             [MCS_index,~] = fc_return_MCS(per_order,j,i, Num_Tx,spatial_stream,freq,...
-%                                                 Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-%                                                 tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI);
-%                                             MCS_index=1;
-%                                         end
-%                                         STA_Info(j).MCS_record(i-Num_AP) = MCS_index;
-                                end
-                                STA_Info(j).CSI_TS(i-Num_AP) = t;
-                                if MIMO_Debug, disp(['  -M: Channel Matrix(CSI), H' num2str(i) num2str(j) ' = ']); disp(STA_Info(j).Channel_Matrix((i-1)*Num_Rx+1:i*Num_Rx, :)); end
-                            end
-                        end
                         TempEvent = event;
                         TempEvent.timer = t;
                         TempEvent.type = 'recv_MAC';
                         TempEvent.STA_ID = j;
                         NewEvents = [NewEvents, TempEvent]; clear TempEvent;
                     elseif (event.pkt.MU == 1 && event.pkt.CoMP == 1)
-                        if (strcmp(event.pkt.type,'Compressed_BF') == 1)
-                            if (STA(j, 3) == 0) % A STA i sends CTS to the AP j and the AP j receives correctly
-                                %all_CoMP_tx = sort(j, STA_Info(j).CoMP_coordinator);
-                                %if (event.pkt.sounding_index(j==all_CoMP_tx, i==event.pkt.CoMPGroup) == 1)
-                                switch PHY_CH_module
-                                    case 'old'
-                                        STA_Info(j).Channel_Matrix((i-1)*Num_Rx+1:i*Num_Rx, :) = sqrt(recv_power(i, j, rmodel))*(randn(Num_Rx, Num_Tx)+1i*randn(Num_Rx, Num_Tx))/sqrt(2);
-                                    case 'new'
-%                                         if STA(i, 3) == j
-%                                             if ((t - STA_Info(j).CSI_TS(i-Num_AP)) < soundingperiod && skip_cal_MCS_sp_Debug)
-%                                                 MCS_index = STA_Info(j).MCS_record(i - Num_AP);
-%                                             else
-%                                                 [MCS_index,~] = fc_return_MCS(per_order,j,i, Num_Tx,spatial_stream,freq,...
-%                                                 Nsubcarrier,default_power,channel_model,Bandwidth,Thermal_noise,...
-%                                                 tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,size_MAC_body,AI);
-%                                             end
-%                                         else
-%                                             MCS_index = 1;
-%                                         end
-%                                         STA_Info(j).MCS_record(i-Num_AP) = MCS_index;
-                                end
-                                STA_Info(j).CSI_TS(i-Num_AP) = t;
-                                if MIMO_Debug, disp(['  -M: Channel Matrix(CSI), H' num2str(i) num2str(j) ' = ']); disp(STA_Info(j).Channel_Matrix((i-1)*Num_Rx+1:i*Num_Rx, :)); end
-                                %end
-                            end
-                        end
                         if ( (strcmp(event.pkt.type, 'Data') ~= 1) || ((strcmp(event.pkt.type, 'Data') == 1) && (CoMP_Controller.information(STA(j,3)).doneData ~= -1) ) ) 
                             TempEvent = event;
                             TempEvent.timer = t;
@@ -2218,119 +1866,6 @@ switch event.type
         if event_Debug, disp(['[' num2str(t, '%1.20f') ']: recv_MAC @ STA ' num2str(j)]); end
         if detail_Debug, disp(['  -D: STA ' num2str(j) ' receives ' num2str(event.pkt.type) ' from ' num2str(i) '.']); end
         switch (event.pkt.type)
-            case 'NDP_Ann'
-                TempEvent = event;
-                if (event.pkt.MU == 0 && event.pkt.CoMP == 0)
-                    STA_Info(j).rxMU = [];
-                    STA_Info(j).rxMU = i;
-                elseif (event.pkt.MU == 1 && event.pkt.CoMP == 0)
-                    STA_Info(j).rxMU = [];
-                    STA_Info(j).rxMU = i;
-                elseif (event.pkt.MU == 1 && event.pkt.CoMP == 1)
-                    STA_Info(j).rxMU = [];
-                    STA_Info(j).rxMU = i;
-                end
-            case 'NDP'
-                % Send back a CTS
-                TempEvent = event;
-                if (event.pkt.MU == 0 && event.pkt.CoMP == 0)
-                    TempEvent.timer = t + SIFS;
-                    TempEvent.type = 'send_PHY';
-                    TempEvent.STA_ID = j;
-                    TempEvent.pkt.type = 'Compressed_BF';
-                    TempEvent.pkt.tx = j;
-                    TempEvent.pkt.rv = i;
-                    TempEvent.pkt.nav = event.pkt.nav - (SIFS + CompressedBeamformingTime);
-                    %disp(['  pkt.tx = ' num2str(TempEvent.pkt.tx) '  pkt.rx = ' num2str(TempEvent.pkt.rv)  '  STA_ID = ' num2str(TempEvent.STA_ID)]);
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                elseif (event.pkt.MU == 1 && event.pkt.CoMP == 0)
-                    STA(j, 7) = 1; % Involve MU transmission
-                    TempEvent.timer = t + SIFS;
-                    TempEvent.type = 'send_PHY';
-                    TempEvent.STA_ID = j;
-                    TempEvent.pkt.type = 'Compressed_BF';
-                    TempEvent.pkt.tx = j;
-                    TempEvent.pkt.rv = i;
-                    TempEvent.pkt.nav = event.pkt.nav - (SIFS + CompressedBeamformingTime);
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                elseif (event.pkt.MU == 1 && event.pkt.CoMP == 1)
-                    STA(j, 7) = 1; % Involve CoMP MU transmission
-                    %if (i == STA_Info(j).rxMU)
-                        TempEvent.timer = t + SIFS;
-                        TempEvent.type = 'send_PHY';
-                        TempEvent.STA_ID = j;
-                        TempEvent.pkt.type = 'Compressed_BF';
-                        TempEvent.pkt.tx = j;
-                        %TempEvent.pkt.rv = STA_Info(j).rxMU;
-                        TempEvent.pkt.rv = i;
-                        TempEvent.pkt.nav = (length(TempEvent.pkt.CoMPGroup)-1) * (SIFS + ReportPollTime + SIFS + CompressedBeamformingTime);
-
-                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                    %end
-
-                end
-
-            case 'Report_P'
-                TempEvent = event;
-                if (event.pkt.MU == 0 && event.pkt.CoMP == 0)
-                    STA(j, 7) = 1;
-                    TempEvent.timer = t + SIFS;
-
-                    TempEvent.type = 'send_PHY';
-
-                    TempEvent.STA_ID = j;
-                    TempEvent.pkt.type = 'Compressed_BF';
-                    TempEvent.pkt.tx = j;
-                    %TempEvent.pkt.rv = STA_Info(j).rxMU;  %for ingnor NDP_Ann failure
-                    TempEvent.pkt.rv = i;
-                    TempEvent.pkt.nav = event.pkt.nav - (SIFS + CompressedBeamformingTime);
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                    
-                elseif (event.pkt.MU == 1 && event.pkt.CoMP == 0)
-                    STA(j, 7) = 1;
-                    TempEvent.timer = t + SIFS;
-
-                    TempEvent.type = 'send_PHY';
-
-                    TempEvent.STA_ID = j;
-                    TempEvent.pkt.type = 'Compressed_BF';
-                    TempEvent.pkt.tx = j;
-                    %TempEvent.pkt.rv = STA_Info(j).rxMU;  %for ingnor NDP_Ann failure
-                    TempEvent.pkt.rv = i;
-                    TempEvent.pkt.nav = event.pkt.nav - (SIFS + CompressedBeamformingTime);
-                    NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-
-                elseif (event.pkt.MU == 1 && event.pkt.CoMP == 1)
-                    STA(j, 7) = 1; % Involve CoMP MU transmission
-                    %if (i == STA_Info(j).rxMU)
-                        TempEvent.timer = t + SIFS;
-
-                        TempEvent.type = 'send_PHY';
-
-                        TempEvent.STA_ID = j;
-                        TempEvent.pkt.type = 'Compressed_BF';
-                        TempEvent.pkt.tx = j;
-                        %TempEvent.pkt.rv = STA_Info(j).rxMU;
-                        TempEvent.pkt.rv = i;
-                        TempEvent.pkt.nav = event.pkt.nav - (SIFS + CompressedBeamformingTime);
-                        %TempEvent.pkt.nav = 0;
-
-                        NewEvents = [NewEvents, TempEvent]; clear TempEvent;
-                    %end
-                end
-
-            case 'Compressed_BF'
-                TempEvent = event;
-                if (event.pkt.MU == 0 && event.pkt.CoMP == 0)
-                    STA_Info(j).rxMU = [STA_Info(j).rxMU, i];
-                    STA_Info(j).soundingqueue = STA_Info(j).soundingqueue(2:length(STA_Info(j).soundingqueue));
-                elseif (event.pkt.MU == 1 && event.pkt.CoMP == 0)
-                    STA_Info(j).rxMU = [STA_Info(j).rxMU, i];
-                    STA_Info(j).soundingqueue = STA_Info(j).soundingqueue(2:length(STA_Info(j).soundingqueue));
-                elseif (event.pkt.MU == 1 && event.pkt.CoMP == 1)
-                    STA_Info(j).rxMU = [STA_Info(j).rxMU, i];
-                    STA_Info(j).soundingqueue = STA_Info(j).soundingqueue(2:length(STA_Info(j).soundingqueue));
-                end
             case 'RTS'
                 TempEvent = event;
                 if (event.pkt.MU == 0 && event.pkt.CoMP == 0)
@@ -2355,13 +1890,6 @@ switch event.type
                     NewEvents = [NewEvents, TempEvent]; clear TempEvent;
                 elseif (event.pkt.MU == 1 && event.pkt.CoMP == 1)
                     STA(j, 7) = 1; % Involve CoMP MU transmission
-%                     if( i == CoMP_Controller.information(i).startorder(1) || length(STA_Info(j).rxMU) > length(STA_Info(i).CoMP_coordinator))
-%                         STA_Info(j).rxMU = [];
-%                     end
-%                     STA_Info(j).rxMU = [STA_Info(j).rxMU, i];
-                    %if (i == CoMP_Controller.information(i).startorder(end))
-%                     if( length(STA_Info(j).rxMU) == 1)
-%                         temp = find(j == event.pkt.CoMPinOrder);
                     if (STA(j,3) == i)  %only reply its associate AP
                         temp = find(j == event.pkt.rv);
                         numorder = find(i == CoMP_Controller.information(i).startorder);
@@ -2370,13 +1898,10 @@ switch event.type
                         TempEvent.STA_ID = j;
                         TempEvent.pkt.type = 'CTS';
                         TempEvent.pkt.tx = j;
-                        %                         TempEvent.pkt.rv = STA_Info(j).rxMU;
                         TempEvent.pkt.rv = STA(j,3);
                         TempEvent.pkt.nav = event.pkt.nav - ((length(CoMP_Controller.information(i).startorder) - numorder)*(SIFS+RTS_tx_time)) - (temp*(SIFS+CTS_tx_time));
                         NewEvents = [NewEvents, TempEvent]; clear TempEvent;
                     end
-                        %STA_Info(j).rxMU = []; %move to sendPHY
-%                     end
                 end
 
             case 'CTS'
