@@ -32,12 +32,12 @@ area_Y = area_array(2);
 Heterogeneous = 1; % [1:802.11ac + 802.11ad , 2: 802.11ad + LTE , 3:802.11ad ]
 
 if(AP_distribution == -2)
-    Num_AP = 4;
+    Num_AP = 2;
     AP_location = [
         40,40; % AP1
-         100,40; % AP2
-        40,100; % AP3
-        100,100; % AP4
+        100,40; % AP2
+%         40,100; % AP3
+%         100,100; % AP4
         ];
     if (User_distribution == -2)
         AP_STA_dis = 30;
@@ -50,13 +50,13 @@ if(AP_distribution == -2)
             AP_location(2,1)+AP_STA_dis*cosd(195),AP_location(2,2)+AP_STA_dis*sind(195);
             AP_location(2,1)+AP_STA_dis*cosd(315),AP_location(2,2)+AP_STA_dis*sind(315);
             
-            AP_location(3,1)+AP_STA_dis*cosd(15),AP_location(3,2)+AP_STA_dis*sind(15);
-            AP_location(3,1)+AP_STA_dis*cosd(135),AP_location(3,2)+AP_STA_dis*sind(135);
-            AP_location(3,1)+AP_STA_dis*cosd(255),AP_location(3,2)+AP_STA_dis*sind(255);
-            
-            AP_location(4,1)+AP_STA_dis*cosd(45),AP_location(4,2)+AP_STA_dis*sind(45);
-            AP_location(4,1)+AP_STA_dis*cosd(165),AP_location(4,2)+AP_STA_dis*sind(165);
-            AP_location(4,1)+AP_STA_dis*cosd(285),AP_location(4,2)+AP_STA_dis*sind(285);
+%             AP_location(3,1)+AP_STA_dis*cosd(15),AP_location(3,2)+AP_STA_dis*sind(15);
+%             AP_location(3,1)+AP_STA_dis*cosd(135),AP_location(3,2)+AP_STA_dis*sind(135);
+%             AP_location(3,1)+AP_STA_dis*cosd(255),AP_location(3,2)+AP_STA_dis*sind(255);
+%             
+%             AP_location(4,1)+AP_STA_dis*cosd(45),AP_location(4,2)+AP_STA_dis*sind(45);
+%             AP_location(4,1)+AP_STA_dis*cosd(165),AP_location(4,2)+AP_STA_dis*sind(165);
+%             AP_location(4,1)+AP_STA_dis*cosd(285),AP_location(4,2)+AP_STA_dis*sind(285);
 %             40,50;
 %             50,40;
 %             50,60;
@@ -77,7 +77,7 @@ if(AP_distribution == -2)
 %             105,120
 %             115,110;
             ];
-          NumUser = 12;
+          NumUser = 6;
     end
 
 
@@ -226,12 +226,12 @@ rx_x_pos = User_location(:,1);
 rx_y_pos = User_location(:,2);
 
 XY_location = [AP_location; User_location];
-%  wall_start = [0 0;140 0; 140 80; 0 80];
-%  wall_end = [140 0; 140 80; 0 80; 0 0];
+ wall_start = [0 0;140 0; 140 80; 0 80];
+ wall_end = [140 0; 140 80; 0 80; 0 0];
 %  wall_start = [0 0;80 0; 80 80; 0 80];
 %  wall_end = [80 0; 80 80; 0 80; 0 0];
-  wall_start = [0 0;140 0; 140 140; 0 140];
- wall_end = [140 0; 140 140; 0 140; 0 0];
+%   wall_start = [0 0;140 0; 140 140; 0 140];
+%  wall_end = [140 0; 140 140; 0 140; 0 0];
 %wall_start=[0   0;ceil(max(XY_location(:, 1))/cover_range)*cover_range 0;ceil(max(XY_location(:, 1))/cover_range)*cover_range ceil(max(XY_location(:, 2))/cover_range)*cover_range;0 ceil(max(XY_location(:, 2))/cover_range)*cover_range];
 %wall_end  =[ceil(max(XY_location(:, 1))/cover_range)*cover_range  0;ceil(max(XY_location(:, 1))/cover_range)*cover_range ceil(max(XY_location(:, 2))/cover_range)*cover_range;0 ceil(max(XY_location(:, 2))/cover_range)*cover_range;0 0];
 end

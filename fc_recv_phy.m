@@ -14,6 +14,7 @@ global tx_interval interference_queue;
 global size_MAC_body;
 global num_msdu;
 global cover_range;
+global CoMP_mode;
 
 tx_x_pos=STA(tx, 1);
 tx_y_pos=STA(tx, 2);
@@ -178,7 +179,7 @@ for ind_sym=1:1:Nsym
             tx1power = interference_queue(tx).power(j);
             if (interference_queue(tx).pkt_type(j) == 2) % tx1 transmits Data pkt
                 if (STA(tx1, 3) == 0) % tx1 is an AP
-                    temp_N_tx = length(STA_Info(tx1).Precoder_record{1}(:,1,1));
+                    temp_N_tx = length(STA_Info(tx1).Precoder_record{1}{1});
                     pr(ind_sym,:) = pr(ind_sym,:) + fc_cal_interference(ind_sym,tx1,rv,temp_N_tx,N_rx,Nsym,freq,...
                         Nsubcarrier,tx1power,channel_model,Bandwidth,Thermal_noise,...
                         tx_ant_gain,reflection_times,wall_mix,wall_index,HOV,room_range,tempindex_AI);
@@ -196,7 +197,19 @@ for ind_sym=1:1:Nsym
         end
     end
     for index_f=1:1:Nsubcarrier
-        SINR(ind_sym,index_f) = (1/(N_tx*N_rx))*Pt*t5{ind_sym}{index_f}/(Thermal_noise+pr(ind_sym,index_f));
+        if(CoMP_mode == 2 && strcmp(pkt_type, 'Data') == 1 && STA(STA_Info(tx).CoMP_coordinator, 5) ~= 0 && ismember(STA_Info(tx).CoMP_coordinator, STA_Info(rv).cover_STA))
+            CoopAP = STA_Info(tx).CoMP_coordinator;
+            CoopAP_N_tx = length(STA_Info(CoopAP).Precoder_record{1}{1});
+            CoopAP_H = STA_Info(CoopAP).Channel_record{ind_sym}{index_f}*STA_Info(CoopAP).Precoder_record{ind_sym}{index_f};
+            CoopAP_rv_order = find(rv == CoMP_Controller.information(CoopAP).pkt.rv);
+            CoopAP_H_user = CoopAP_H((order-1)*N_rx+1:1:(CoopAP_rv_order-1)*N_rx+N_rx,(CoopAP_rv_order-1)*N_rx+1:1:(CoopAP_rv_order-1)*N_rx+N_rx);
+            CoopAP_H_transmit = CoopAP_H_user'*CoopAP_H_user;
+            CoopAP_t5 = trace(CoopAP_H_transmit);
+            CoopAP_Pt = STA(CoopAP, 5);
+            SINR(ind_sym,index_f) = ((1/(N_tx*N_rx))*Pt*abs(t5{ind_sym}{index_f}) + (1/(CoopAP_N_tx*N_rx))*CoopAP_Pt*abs(CoopAP_t5))/(Thermal_noise+pr(ind_sym,index_f));
+        else
+            SINR(ind_sym,index_f) = (1/(N_tx*N_rx))*Pt*abs(t5{ind_sym}{index_f})/(Thermal_noise+pr(ind_sym,index_f));
+        end
     end
     time = time - multi_symbol*SymbolTime(GI);
 end

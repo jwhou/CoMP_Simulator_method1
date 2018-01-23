@@ -122,7 +122,8 @@ for index_f=1:1:Nsubcarrier
         H_new(:,:,index_f)=H_freq(:,:,index_f)*STA_Info(tx).Precoder_record{ind_sym}{index_f};
         t5(index_f) = trace(H_new(:,:,index_f)'*H_new(:,:,index_f)); %SNR
     end
-    pr(index_f) = (Pt*t5(index_f))/(N_tx*N_rx);
+    %pr(index_f) = (Pt*t5(index_f))/(N_tx*N_rx);
+    pr(index_f) = (Pt*abs(t5(index_f)))/(N_rx);
 end
 
 end
