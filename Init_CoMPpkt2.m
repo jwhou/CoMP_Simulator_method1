@@ -84,7 +84,7 @@ if CoMP_Controller.information(i).numInform == 0
                         Antenna_list(k) = Antenna_list(k) - Num_Rx;
                     end
                     if isempty(Temp_STA1)
-                        temp_queue{k} = tempqueue1(tempqueue1 ~= First_STA);
+                        temp_queue{k} = temp_queue1(temp_queue1 ~= First_STA);
                     else
                         STA_list = [STA_list Temp_STA1 Temp_STA2];
                         temp_queue{k} = temp_queue1(temp_queue1 ~= Temp_STA1);
